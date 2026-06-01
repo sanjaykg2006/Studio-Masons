@@ -79,7 +79,7 @@ export default function OrdersPage() {
             <span className="material-symbols-outlined text-[40px] text-[#e4e2e1]">receipt_long</span>
           </div>
           <h3 className="text-[20px] font-bold text-[#333333] mb-2">No Invoices Found</h3>
-          <p className="text-[16px] text-[#666666] max-w-md">No invoices match the selected project <span className="font-bold text-[#e30613]">{selectedProject?.name}</span>.</p>
+          <p className="text-[16px] text-[#666666] w-full max-w-md">No invoices match the selected project <span className="font-bold text-[#e30613]">{selectedProject?.name}</span>.</p>
         </div>
       ) : (
         <>

@@ -40,7 +40,7 @@ export default function DLPPage() {
             <span className="material-symbols-outlined text-[40px] text-[#e4e2e1]">handyman</span>
           </div>
           <h3 className="text-[20px] font-bold text-[#333333] mb-2">No Project Selected</h3>
-          <p className="text-[16px] text-[#666666] max-w-md">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its DLP tickets.</p>
+          <p className="text-[16px] text-[#666666] w-full max-w-md">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its DLP tickets.</p>
         </div>
       </div>
     );
