@@ -25,7 +25,7 @@ const worker = new Worker('erp-sync', async (job) => {
       await postScopeToERP(projectId, {
         clientName: project.clientName,
         location: project.location,
-        boqItems: project.boqItems.map(b => ({
+        boqItems: project.boqItems.map((b: { workItem: string; budgetedQty: unknown; unitRate: unknown }) => ({
           workItem: b.workItem,
           qty: Number(b.budgetedQty),
           rate: Number(b.unitRate),
