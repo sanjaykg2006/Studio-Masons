@@ -1,0 +1,134 @@
+studio-masons-erp/
+├── .env.local
+├── .env.example
+├── next.config.js
+├── tailwind.config.ts
+├── tsconfig.json
+├── package.json
+│
+├── prisma/
+│   ├── schema.prisma              # DB models
+│   └── seed.ts                    # Seed data
+│
+├── supabase/
+│   └── storage-buckets.sql        # Storage bucket setup
+│
+├── src/
+│   ├── app/                       # Next.js App Router
+│   │   ├── layout.tsx             # Root layout (sidebar + topbar)
+│   │   ├── page.tsx               # Redirect to /dashboard
+│   │   ├── (auth)/
+│   │   │   ├── login/page.tsx
+│   │   │   └── layout.tsx
+│   │   ├── (erp)/                 # Main ERP layout group
+│   │   │   ├── layout.tsx         # Sidebar + topbar shell
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx
+│   │   │   ├── site-survey/
+│   │   │   │   ├── page.tsx       # List all surveys
+│   │   │   │   ├── [id]/page.tsx  # Survey detail
+│   │   │   │   └── new/page.tsx   # New survey form
+│   │   │   ├── design/
+│   │   │   │   ├── page.tsx       # Design file list
+│   │   │   │   └── [id]/page.tsx  # File approval flow
+│   │   │   ├── orders/
+│   │   │   │   ├── page.tsx       # Tab layout: invoices/payments/expenses/scope
+│   │   │   │   └── [id]/page.tsx
+│   │   │   ├── quality/
+│   │   │   │   └── page.tsx
+│   │   │   ├── snags/
+│   │   │   │   ├── page.tsx       # Snag board
+│   │   │   │   └── [id]/page.tsx
+│   │   │   ├── site-progress/
+│   │   │   │   ├── page.tsx       # BOQ / Schedule / DPR / GRN tabs
+│   │   │   │   └── boq/page.tsx
+│   │   │   ├── audit/
+│   │   │   │   └── page.tsx
+│   │   │   ├── dlp/
+│   │   │   │   └── page.tsx
+│   │   │   └── erp-integration/
+│   │   │       └── page.tsx       # Admin only
+│   │   │
+│   │   └── api/                   # API Routes (Next.js)
+│   │       ├── auth/[...nextauth]/route.ts
+│   │       ├── projects/route.ts
+│   │       ├── surveys/route.ts
+│   │       ├── designs/
+│   │       │   ├── route.ts
+│   │       │   └── [id]/approve/route.ts
+│   │       ├── orders/
+│   │       │   ├── invoices/route.ts
+│   │       │   └── expenses/route.ts
+│   │       ├── snags/route.ts
+│   │       ├── progress/
+│   │       │   ├── boq/route.ts
+│   │       │   └── grn/route.ts
+│   │       └── erp/
+│   │           ├── sync-scope/route.ts    # POST to ERP
+│   │           └── fetch-po/route.ts      # GET from ERP
+│   │
+│   ├── components/
+│   │   ├── layout/
+│   │   │   ├── Sidebar.tsx
+│   │   │   ├── Topbar.tsx
+│   │   │   └── ProjectSelector.tsx
+│   │   ├── ui/                    # shadcn/ui components (auto-generated)
+│   │   │   ├── button.tsx
+│   │   │   ├── dialog.tsx
+│   │   │   ├── table.tsx
+│   │   │   ├── tabs.tsx
+│   │   │   ├── badge.tsx
+│   │   │   ├── sheet.tsx          # Slide-over panel
+│   │   │   └── ...
+│   │   ├── dashboard/
+│   │   │   ├── KPICard.tsx
+│   │   │   ├── ActivityFeed.tsx
+│   │   │   └── ProjectHealthTable.tsx
+│   │   ├── design/
+│   │   │   ├── FileUploadZone.tsx
+│   │   │   ├── DesignFileTable.tsx
+│   │   │   └── ApprovalStatusBadge.tsx
+│   │   ├── orders/
+│   │   │   ├── InvoiceTable.tsx
+│   │   │   ├── ExpenseForm.tsx
+│   │   │   └── VendorSlideOver.tsx
+│   │   ├── snags/
+│   │   │   ├── SnagCard.tsx
+│   │   │   ├── SnagBoard.tsx
+│   │   │   └── NewSnagModal.tsx
+│   │   ├── progress/
+│   │   │   ├── BOQTable.tsx
+│   │   │   ├── GanttPlaceholder.tsx
+│   │   │   └── GRNForm.tsx
+│   │   └── erp/
+│   │       ├── SyncStatus.tsx
+│   │       └── POTable.tsx
+│   │
+│   ├── lib/
+│   │   ├── prisma.ts              # Prisma client singleton
+│   │   ├── supabase.ts            # Supabase client
+│   │   ├── auth.ts                # NextAuth config
+│   │   ├── erp-client.ts          # ERP POST/GET service
+│   │   ├── queue.ts               # BullMQ queue setup
+│   │   └── utils.ts               # cn(), formatters
+│   │
+│   ├── hooks/
+│   │   ├── useProjects.ts         # TanStack Query hooks
+│   │   ├── useSnags.ts
+│   │   ├── useDesignFiles.ts
+│   │   └── useERPSync.ts
+│   │
+│   ├── types/
+│   │   ├── index.ts               # Shared types
+│   │   ├── erp.ts                 # ERP API types
+│   │   └── database.ts            # Generated from Prisma
+│   │
+│   └── styles/
+│       └── globals.css            # Tailwind base + SM theme vars
+│
+├── workers/
+│   └── erp-sync.worker.ts         # BullMQ worker (runs separately)
+│
+└── docs/
+    ├── api.md
+    └── erp-integration.md

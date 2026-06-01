@@ -1,0 +1,278 @@
+// Studio Masons ERP — Prisma Schema
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  PROJECT_MANAGER
+  DESIGNER
+  SITE_ENGINEER
+  FINANCE
+  CLIENT
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum DesignFileStatus {
+  PENDING_REVIEW
+  APPROVED_INTERNALLY
+  CLIENT_APPROVED
+  CHANGES_REQUESTED
+}
+
+enum SnagStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SnagPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum ERPSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role
+  avatarUrl String?
+  createdAt DateTime @default(now())
+
+  assignedSnags   Snag[]        @relation("SnagAssignee")
+  uploadedDesigns DesignFile[]
+  surveys         SiteSurvey[]
+  activityLogs    ActivityLog[]
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  clientName  String
+  location    String
+  status      ProjectStatus @default(ACTIVE)
+  startDate   DateTime
+  endDate     DateTime?
+  totalBudget Decimal       @db.Decimal(15, 2)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  surveys          SiteSurvey[]
+  designFiles      DesignFile[]
+  orders           Order[]
+  expenses         SiteExpense[]
+  snags            Snag[]
+  boqItems         BOQItem[]
+  scheduleItems    ProjectSchedule[]
+  grns             GRNEntry[]
+  auditChecklist   AuditItem[]
+  dlpTickets       DLPTicket[]
+  erpSync          ERPSync?
+  activityLogs     ActivityLog[]
+}
+
+model SiteSurvey {
+  id          String   @id @default(cuid())
+  projectId   String
+  conductedBy String
+  surveyDate  DateTime
+  notes       String?
+  mediaUrls   String[]
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [conductedBy], references: [id])
+}
+
+model DesignFile {
+  id           String           @id @default(cuid())
+  projectId    String
+  uploadedById String
+  fileName     String
+  fileUrl      String
+  version      Int              @default(1)
+  status       DesignFileStatus @default(PENDING_REVIEW)
+  reviewNotes  String?
+  uploadedAt   DateTime         @default(now())
+  approvedAt   DateTime?
+
+  project    Project @relation(fields: [projectId], references: [id])
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+}
+
+model Order {
+  id          String        @id @default(cuid())
+  projectId   String
+  vendorName  String
+  description String
+  amount      Decimal       @db.Decimal(15, 2)
+  status      InvoiceStatus @default(DRAFT)
+  invoiceUrl  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  project  Project         @relation(fields: [projectId], references: [id])
+  payments VendorPayment[]
+}
+
+model VendorPayment {
+  id          String    @id @default(cuid())
+  orderId     String
+  amount      Decimal   @db.Decimal(15, 2)
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  paidAt      DateTime?
+  notes       String?
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model SiteExpense {
+  id          String   @id @default(cuid())
+  projectId   String
+  category    String
+  description String
+  amount      Decimal  @db.Decimal(15, 2)
+  receiptUrl  String?
+  incurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model Snag {
+  id          String       @id @default(cuid())
+  projectId   String
+  assignedTo  String?
+  title       String
+  description String
+  location    String
+  photoUrls   String[]
+  priority    SnagPriority @default(MEDIUM)
+  status      SnagStatus   @default(OPEN)
+  createdAt   DateTime     @default(now())
+  resolvedAt  DateTime?
+
+  project  Project @relation(fields: [projectId], references: [id])
+  assignee User?   @relation("SnagAssignee", fields: [assignedTo], references: [id])
+}
+
+model BOQItem {
+  id           String   @id @default(cuid())
+  projectId    String
+  workItem     String
+  unit         String
+  budgetedQty  Decimal  @db.Decimal(10, 2)
+  installedQty Decimal  @db.Decimal(10, 2) @default(0)
+  unitRate     Decimal  @db.Decimal(15, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model ProjectSchedule {
+  id           String   @id @default(cuid())
+  projectId    String
+  taskName     String
+  startDate    DateTime
+  endDate      DateTime
+  progress     Int      @default(0)
+  parentTaskId String?
+
+  project  Project           @relation(fields: [projectId], references: [id])
+  parent   ProjectSchedule?  @relation("TaskChildren", fields: [parentTaskId], references: [id])
+  children ProjectSchedule[] @relation("TaskChildren")
+}
+
+model GRNEntry {
+  id           String   @id @default(cuid())
+  projectId    String
+  materialName String
+  quantity     Decimal  @db.Decimal(10, 2)
+  unit         String
+  receivedAt   DateTime @default(now())
+  supplierName String
+  notes        String?
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model AuditItem {
+  id          String    @id @default(cuid())
+  projectId   String
+  checkItem   String
+  passed      Boolean?
+  notes       String?
+  checkedAt   DateTime?
+  signedOffBy String?
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model DLPTicket {
+  id          String    @id @default(cuid())
+  projectId   String
+  title       String
+  description String
+  reportedAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+  amcDueDate  DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model ERPSync {
+  id             String        @id @default(cuid())
+  projectId      String        @unique
+  lastSyncAt     DateTime?
+  status         ERPSyncStatus @default(PENDING)
+  scopeDataSent  Boolean       @default(false)
+  poCreated      Boolean       @default(false)
+  errorLog       String?
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+}

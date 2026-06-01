@@ -1,0 +1,299 @@
+"use client";
+import { useState } from "react";
+
+const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
+
+const teamMembers = [
+  { name: "Vikram R.", email: "vikram@studiomasons.in", role: "Site Engineer", status: "Active", avatar: "VR" },
+  { name: "Sneha P.", email: "sneha@studiomasons.in", role: "Project Manager", status: "Active", avatar: "SP" },
+  { name: "Amit S.", email: "amit@studiomasons.in", role: "Site Engineer", status: "Active", avatar: "AS" },
+  { name: "Rahul K.", email: "rahul@studiomasons.in", role: "Designer", status: "Active", avatar: "RK" },
+  { name: "Priya M.", email: "priya@studiomasons.in", role: "Finance", status: "Invited", avatar: "PM" },
+];
+
+const roles = ["Admin", "Project Manager", "Designer", "Site Engineer", "Finance", "Client"];
+
+const notifications = [
+  { label: "New snag raised", desc: "Get notified when a snag is raised on your project", email: true, inApp: true },
+  { label: "Design approval required", desc: "When a design file needs your review", email: true, inApp: true },
+  { label: "Invoice pending approval", desc: "Vendor invoices awaiting sign-off", email: false, inApp: true },
+  { label: "ERP sync completed", desc: "When scope data is successfully synced to ERP", email: false, inApp: true },
+  { label: "AMC due reminder", desc: "7 days before an AMC service is due", email: true, inApp: false },
+  { label: "Project milestone reached", desc: "When BOQ completion crosses a threshold", email: true, inApp: true },
+];
+
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState(0);
+  const [notifs, setNotifs] = useState(notifications);
+  const [erpConnected, setErpConnected] = useState(false);
+  const [erpUrl, setErpUrl] = useState("");
+  const [erpKey, setErpKey] = useState("");
+
+  const toggleNotif = (i: number, type: "email" | "inApp") => {
+    setNotifs(prev => prev.map((n, idx) => idx !== i ? n : { ...n, [type === "email" ? "email" : "inApp"]: !n[type === "email" ? "email" : "inApp"] }));
+  };
+
+  return (
+    <div>
+      <nav className="flex items-center gap-2 mb-4 text-[#666666] text-[10px] font-bold uppercase tracking-widest">
+        <span>Dashboard</span>
+        <span className="material-symbols-outlined" style={{fontSize:"12px"}}>chevron_right</span>
+        <span className="text-[#e30613]">Settings</span>
+      </nav>
+
+      <div className="flex justify-between items-end mb-10">
+        <div>
+          <h2 className="text-[32px] font-bold text-[#333333] mb-2">Settings</h2>
+          <p className="text-[#666666]">Manage your account, team, integrations, and preferences.</p>
+        </div>
+      </div>
+
+      {/* Tab Bar */}
+      <div className="flex gap-8 border-b border-[#e4e2e1] mb-8">
+        {tabs.map((t, i) => (
+          <button key={i} onClick={() => setActiveTab(i)}
+            className={`pb-4 border-b-2 text-[14px] font-bold transition-all ${activeTab === i ? "border-[#e30613] text-[#e30613]" : "border-transparent text-[#666666] hover:text-[#333333]"}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {/* Profile Tab */}
+      {activeTab === 0 && (
+        <div className="max-w-2xl">
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm mb-6">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex items-center gap-2">
+              <div className="w-1 h-5 bg-[#e30613]" />
+              <h3 className="text-[18px] font-medium text-[#333333]">Personal Information</h3>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-6 mb-6">
+                <div style={{width:"72px",height:"72px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",fontWeight:"bold",color:"white",flexShrink:0}}>SM</div>
+                <div>
+                  <button className="px-4 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-[#f8f8f8] transition-all mr-3">Change Photo</button>
+                  <button className="px-4 py-2 text-[13px] font-bold text-[#ba1a1a] hover:underline">Remove</button>
+                </div>
+              </div>
+              {[
+                { label: "Full Name", value: "Studio Masons Admin", type: "text" },
+                { label: "Email", value: "admin@studiomasons.in", type: "email" },
+                { label: "Phone", value: "+91 98765 43210", type: "tel" },
+                { label: "Designation", value: "Project Director", type: "text" },
+              ].map((f, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <label className="text-[13px] font-bold text-[#e30613] uppercase">{f.label}</label>
+                  <input defaultValue={f.value} type={f.type} className="bg-white border border-[#e4e2e1] rounded p-3 text-[15px] focus:outline-none focus:border-[#e30613] transition-all" />
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
+              <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE CHANGES</button>
+            </div>
+          </div>
+          <div className="bg-white border border-[#ba1a1a]/20 rounded-xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-[#ba1a1a]/20 bg-[#ba1a1a]/5 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#ba1a1a]">warning</span>
+              <h3 className="text-[18px] font-medium text-[#ba1a1a]">Danger Zone</h3>
+            </div>
+            <div className="p-6 flex justify-between items-center">
+              <div>
+                <p className="font-bold text-[#333333]">Change Password</p>
+                <p className="text-[#666666] text-[13px]">Update your account password</p>
+              </div>
+              <button className="px-4 py-2 border border-[#ba1a1a]/40 rounded text-[#ba1a1a] text-[13px] font-bold hover:bg-[#ba1a1a]/10 transition-all">CHANGE</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Tab */}
+      {activeTab === 1 && (
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <p className="text-[#666666]">{teamMembers.length} members in your workspace</p>
+            <button className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
+              <span className="material-symbols-outlined" style={{fontSize:"18px"}}>person_add</span> INVITE MEMBER
+            </button>
+          </div>
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#f8f8f8] border-b border-[#e4e2e1]">
+                  {["Member", "Email", "Role", "Status", "Actions"].map(h => (
+                    <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-[#666666]">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#e4e2e1]">
+                {teamMembers.map((m, i) => (
+                  <tr key={i} className="hover:bg-[#f8f8f8] transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:"36px",height:"36px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"bold",color:"white",flexShrink:0}}>{m.avatar}</div>
+                        <span className="font-medium text-[#333333]">{m.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-[#666666] text-[14px]">{m.email}</td>
+                    <td className="px-6 py-4">
+                      <select defaultValue={m.role} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613]">
+                        {roles.map(r => <option key={r}>{r}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span style={{padding:"3px 10px",borderRadius:"999px",fontSize:"10px",fontWeight:"bold",background:m.status==="Active"?"rgba(22,163,74,0.1)":"rgba(227,6,19,0.1)",color:m.status==="Active"?"#16a34a":"#e30613",border:`1px solid ${m.status==="Active"?"rgba(22,163,74,0.2)":"rgba(227,6,19,0.2)"}`}}>{m.status}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button className="text-[#666666] hover:text-[#ba1a1a] transition-colors">
+                        <span className="material-symbols-outlined" style={{fontSize:"18px"}}>more_vert</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications Tab */}
+      {activeTab === 2 && (
+        <div className="max-w-2xl">
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8]">
+              <div className="grid grid-cols-3 gap-4">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#666666]">Notification</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#666666] text-center">Email</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#666666] text-center">In-App</span>
+              </div>
+            </div>
+            <div className="divide-y divide-[#e4e2e1]">
+              {notifs.map((n, i) => (
+                <div key={i} className="px-6 py-4 grid grid-cols-3 gap-4 items-center hover:bg-[#f8f8f8] transition-colors">
+                  <div>
+                    <p className="font-medium text-[#333333] text-[14px]">{n.label}</p>
+                    <p className="text-[#666666] text-[12px] mt-0.5">{n.desc}</p>
+                  </div>
+                  {(["email", "inApp"] as const).map(type => (
+                    <div key={type} className="flex justify-center">
+                      <button onClick={() => toggleNotif(i, type)}
+                        style={{width:"44px",height:"24px",borderRadius:"12px",background:n[type]?"#e30613":"#e4e2e1",position:"relative",transition:"background 0.2s",border:"none",cursor:"pointer"}}>
+                        <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"white",position:"absolute",top:"3px",transition:"left 0.2s",left:n[type]?"23px":"3px",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
+              <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE PREFERENCES</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ERP Connection Tab */}
+      {activeTab === 3 && (
+        <div className="max-w-2xl">
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm mb-6">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-5 bg-[#e30613]" />
+                <h3 className="text-[18px] font-medium text-[#333333]">ERP System Connection</h3>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                <div style={{width:"8px",height:"8px",borderRadius:"50%",background:erpConnected?"#16a34a":"#e4e2e1"}} />
+                <span style={{fontSize:"12px",fontWeight:"bold",color:erpConnected?"#16a34a":"#666666"}}>{erpConnected?"Connected":"Disconnected"}</span>
+              </div>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">ERP Base URL</label>
+                <input value={erpUrl} onChange={e => setErpUrl(e.target.value)} placeholder="https://your-erp-system.com" className="bg-white border border-[#e4e2e1] rounded p-3 text-[15px] focus:outline-none focus:border-[#e30613]" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">API Key</label>
+                <input value={erpKey} onChange={e => setErpKey(e.target.value)} type="password" placeholder="••••••••••••••••" className="bg-white border border-[#e4e2e1] rounded p-3 text-[15px] focus:outline-none focus:border-[#e30613]" />
+              </div>
+              <div className="flex gap-4 pt-2">
+                <button onClick={() => setErpConnected(true)} className="flex-1 bg-[#e30613] text-white py-3 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">TEST & CONNECT</button>
+                {erpConnected && <button onClick={() => setErpConnected(false)} className="px-5 py-3 border border-[#ba1a1a]/40 text-[#ba1a1a] rounded font-bold text-[14px] hover:bg-[#ba1a1a]/10 transition-all">DISCONNECT</button>}
+              </div>
+            </div>
+          </div>
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex items-center gap-2">
+              <div className="w-1 h-5 bg-[#e30613]" />
+              <h3 className="text-[18px] font-medium text-[#333333]">Sync Settings</h3>
+            </div>
+            <div className="divide-y divide-[#e4e2e1]">
+              {[
+                { label: "Auto-sync scope on approval", desc: "Automatically POST scope data when a project is approved" },
+                { label: "Fetch POs on login", desc: "Pull latest Purchase Orders from ERP on each session start" },
+                { label: "Retry failed syncs", desc: "Automatically retry failed ERP syncs up to 3 times" },
+              ].map((s, i) => (
+                <div key={i} className="px-6 py-4 flex justify-between items-center">
+                  <div>
+                    <p className="font-medium text-[#333333] text-[14px]">{s.label}</p>
+                    <p className="text-[#666666] text-[12px]">{s.desc}</p>
+                  </div>
+                  <div style={{width:"44px",height:"24px",borderRadius:"12px",background:"#e30613",position:"relative",cursor:"pointer"}}>
+                    <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"white",position:"absolute",top:"3px",left:"23px",boxShadow:"0 1px 3px rgba(0,0,0,0.2)"}} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Appearance Tab */}
+      {activeTab === 4 && (
+        <div className="max-w-2xl">
+          <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex items-center gap-2">
+              <div className="w-1 h-5 bg-[#e30613]" />
+              <h3 className="text-[18px] font-medium text-[#333333]">Appearance & Theme</h3>
+            </div>
+            <div className="p-6 space-y-8">
+              <div>
+                <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Colour Theme</p>
+                <div className="flex gap-4">
+                  {[
+                    { name: "Studio Red", color: "#e30613", active: true },
+                    { name: "Midnight", color: "#1b1c1c", active: false },
+                    { name: "Forest", color: "#16a34a", active: false },
+                    { name: "Ocean", color: "#0059a8", active: false },
+                  ].map((t, i) => (
+                    <div key={i} style={{textAlign:"center",cursor:"pointer"}}>
+                      <div style={{width:"48px",height:"48px",borderRadius:"50%",background:t.color,margin:"0 auto 8px",border:t.active?"3px solid #e30613":"3px solid transparent",boxShadow:t.active?"0 0 0 2px rgba(227,6,19,0.3)":"none"}} />
+                      <p style={{fontSize:"11px",fontWeight:t.active?"bold":"normal",color:t.active?"#e30613":"#666666"}}>{t.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Sidebar Style</p>
+                <div className="flex gap-4">
+                  {["Compact", "Default", "Wide"].map((s, i) => (
+                    <button key={i} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${i===1 ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Date Format</p>
+                <div className="flex gap-4">
+                  {["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"].map((f, i) => (
+                    <button key={i} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${i===0 ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{f}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
+              <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE APPEARANCE</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

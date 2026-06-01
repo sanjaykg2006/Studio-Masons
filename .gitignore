@@ -1,5 +1,28 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.env
 
+# Project specific
+uploads/
+clips/
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
 # dependencies
 /node_modules
 /.pnp
@@ -39,3 +62,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/app/generated/prisma
