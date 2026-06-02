@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../../contexts/ProjectContext";
+import { useToast } from "@/lib/toast";
 
 const statusStyle: Record<string, { bg: string; border: string; color: string }> = {
   "In Progress": { bg: "rgba(227,6,19,0.1)",  border: "rgba(227,6,19,0.2)",  color: "#e30613" },
@@ -32,8 +33,48 @@ const allActivity = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, selectedProject } = useProject();
+  const toast = useToast();
+  const { projects, selectedProject, vendorPOs, addVendorPO, getProjectVendorPOs } = useProject();
   const [showAdd, setShowAdd]         = useState(false);
+
+  // ── Vendor / Purchase Order add flow ──────────────────────────────
+  const [showAddVendor, setShowAddVendor] = useState(false);
+  const [vendorForm, setVendorForm]       = useState({ vendorName: "", poNumber: "", poValue: "" });
+  const [poFile, setPoFile]               = useState<File | null>(null);
+
+  // Vendors shown: the selected project's, or all when viewing the overview.
+  const vendorRows = selectedProject ? getProjectVendorPOs(selectedProject.id) : vendorPOs;
+  const projectName = (id: string) => projects.find(p => p.id === id)?.name ?? "—";
+  const totalPO = vendorRows.reduce((s, v) => s + v.poValue, 0);
+
+  const vendorFormValid =
+    vendorForm.vendorName.trim() &&
+    vendorForm.poNumber.trim() &&
+    Number(vendorForm.poValue) > 0 &&
+    poFile != null;
+
+  function submitVendor() {
+    if (!selectedProject || !vendorFormValid || !poFile) {
+      toast.warning("Missing details", "Fill in every field and attach the purchase-order document before saving.");
+      return;
+    }
+    try {
+      addVendorPO({
+        projectId: selectedProject.id,
+        vendorName: vendorForm.vendorName,
+        poNumber: vendorForm.poNumber,
+        poValue: Number(vendorForm.poValue),
+        poFileName: poFile.name,
+      });
+      setVendorForm({ vendorName: "", poNumber: "", poValue: "" });
+      setPoFile(null);
+      setShowAddVendor(false);
+      toast.success("Vendor added", `${vendorForm.vendorName.trim()} was procured for ${selectedProject.name}.`);
+    } catch (err) {
+      console.error("[Dashboard] Failed to add vendor:", err);
+      toast.error("Couldn't add vendor", "Something went wrong while saving. Please try again.");
+    }
+  }
 
   const onTrackCount   = projects.filter(p => p.status === "On Track" || p.status === "In Progress").length;
   const delayedCount   = projects.filter(p => p.status === "Delayed").length;
@@ -49,7 +90,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div>
+    <div style={{ paddingBottom: "120px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: "#666666", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em" }}>
         <span>Main</span>
         <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>chevron_right</span>
@@ -212,6 +253,86 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Vendors & Purchase Orders */}
+      <div style={{ marginTop: "40px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <div>
+            <h2 style={{ fontSize: "24px", fontWeight: "bold", color: "#333333" }}>Vendors & Purchase Orders</h2>
+            <p style={{ fontSize: "12px", color: "#666666", marginTop: "2px" }}>
+              {selectedProject
+                ? <>Vendors procured for <strong style={{ color: "#333333" }}>{selectedProject.name}</strong> and the purchase orders given</>
+                : <>Vendors procured across all projects — select a project to add one</>}
+            </p>
+          </div>
+          <button
+            onClick={() => { setVendorForm({ vendorName: "", poNumber: "", poValue: "" }); setPoFile(null); setShowAddVendor(true); }}
+            disabled={!selectedProject}
+            title={selectedProject ? "Add a vendor and purchase order" : "Select a project first"}
+            style={{ padding: "10px 20px", border: "none", borderRadius: "8px", background: selectedProject ? "#e30613" : "#e4e2e1", color: "white", fontSize: "13px", fontWeight: "bold", cursor: selectedProject ? "pointer" : "not-allowed", display: "flex", alignItems: "center", gap: "6px" }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>add_business</span>
+            Add Vendor
+          </button>
+        </div>
+        <div style={{ background: "#f8f8f8", border: "1px solid #e4e2e1", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", borderRadius: "8px" }}>
+          {vendorRows.length === 0 ? (
+            <div style={{ padding: "48px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", color: "#999999" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: "36px" }}>inventory_2</span>
+              <p style={{ fontSize: "14px" }}>No vendors procured yet{selectedProject ? ` for ${selectedProject.name}` : ""}</p>
+              {selectedProject && (
+                <button onClick={() => setShowAddVendor(true)} style={{ color: "#e30613", fontSize: "12px", fontWeight: "bold", background: "none", border: "none", cursor: "pointer" }}>
+                  + Add the first vendor
+                </button>
+              )}
+            </div>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #e4e2e1" }}>
+                  {(selectedProject
+                    ? ["Vendor Procured", "PO Number", "Purchase Order Given"]
+                    : ["Vendor Procured", "Project", "PO Number", "Purchase Order Given"]
+                  ).map(h => (
+                    <th key={h} style={{ padding: "14px 24px", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em", color: "#666666", textAlign: h === "Purchase Order Given" ? "right" : "left" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {vendorRows.map(v => (
+                  <tr key={v.id} style={{ borderBottom: "1px solid white", background: "rgba(255,255,255,0.5)" }}>
+                    <td style={{ padding: "14px 24px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ width: "4px", height: "16px", background: "#e30613", flexShrink: 0 }} />
+                        <span style={{ color: "#333333", fontWeight: 500 }}>{v.vendorName}</span>
+                      </div>
+                    </td>
+                    {!selectedProject && (
+                      <td style={{ padding: "14px 24px", color: "#666666", fontSize: "14px" }}>{projectName(v.projectId)}</td>
+                    )}
+                    <td style={{ padding: "14px 24px", color: "#666666", fontSize: "13px", fontWeight: 600 }}>
+                      <span>{v.poNumber}</span>
+                      {v.poFileName && (
+                        <span style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px", fontSize: "11px", fontWeight: 400, color: "#999999" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>description</span>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "180px" }}>{v.poFileName}</span>
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: "14px 24px", color: "#333333", fontSize: "14px", fontWeight: "bold", textAlign: "right" }}>₹{v.poValue.toLocaleString("en-IN")}</td>
+                  </tr>
+                ))}
+                <tr style={{ background: "#f0eded" }}>
+                  <td colSpan={selectedProject ? 2 : 3} style={{ padding: "14px 24px", fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em", color: "#666666" }}>
+                    Total Purchase Orders ({vendorRows.length})
+                  </td>
+                  <td style={{ padding: "14px 24px", color: "#e30613", fontSize: "15px", fontWeight: "bold", textAlign: "right" }}>₹{totalPO.toLocaleString("en-IN")}</td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
       {/* FAB */}
       <button
         onClick={() => setShowAdd(true)}
@@ -258,6 +379,112 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined" style={{ color: "#ccc", fontSize: "20px" }}>chevron_right</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Vendor / Purchase Order Modal */}
+      {showAddVendor && selectedProject && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowAddVendor(false)}
+        >
+          <div
+            style={{ background: "white", borderRadius: "12px", width: "100%", maxWidth: "440px", margin: "16px", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 24px", borderBottom: "1px solid #e4e2e1" }}>
+              <div>
+                <p style={{ fontSize: "18px", fontWeight: "bold", color: "#333333" }}>Add Vendor</p>
+                <p style={{ fontSize: "12px", color: "#666666", marginTop: "2px" }}>Procure a vendor for {selectedProject.name}</p>
+              </div>
+              <button onClick={() => setShowAddVendor(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#666666", display: "flex" }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "18px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#333333", marginBottom: "6px" }}>
+                  Vendor Name <span style={{ color: "#e30613" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Blackwood Stonemasons Ltd."
+                  value={vendorForm.vendorName}
+                  onChange={e => setVendorForm(prev => ({ ...prev, vendorName: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 14px", border: "1px solid #e4e2e1", borderRadius: "6px", fontSize: "14px", color: "#333333", background: "white", outline: "none", boxSizing: "border-box" }}
+                  onFocus={e => (e.target.style.borderColor = "#e30613")}
+                  onBlur={e => (e.target.style.borderColor = "#e4e2e1")}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#333333", marginBottom: "6px" }}>
+                    PO Number <span style={{ color: "#e30613" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. PO-2841"
+                    value={vendorForm.poNumber}
+                    onChange={e => setVendorForm(prev => ({ ...prev, poNumber: e.target.value }))}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #e4e2e1", borderRadius: "6px", fontSize: "14px", color: "#333333", background: "white", outline: "none", boxSizing: "border-box" }}
+                    onFocus={e => (e.target.style.borderColor = "#e30613")}
+                    onBlur={e => (e.target.style.borderColor = "#e4e2e1")}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#333333", marginBottom: "6px" }}>
+                    Purchase Order Value (₹) <span style={{ color: "#e30613" }}>*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="e.g. 50000"
+                    value={vendorForm.poValue}
+                    onChange={e => setVendorForm(prev => ({ ...prev, poValue: e.target.value }))}
+                    style={{ width: "100%", padding: "10px 14px", border: "1px solid #e4e2e1", borderRadius: "6px", fontSize: "14px", color: "#333333", background: "white", outline: "none", boxSizing: "border-box" }}
+                    onFocus={e => (e.target.style.borderColor = "#e30613")}
+                    onBlur={e => (e.target.style.borderColor = "#e4e2e1")}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: "bold", color: "#333333", marginBottom: "6px" }}>
+                  Purchase Order Document <span style={{ color: "#e30613" }}>*</span>
+                </label>
+                <label
+                  htmlFor="po-file"
+                  style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px", border: `1px ${poFile ? "solid" : "dashed"} ${poFile ? "#16a34a" : "#e4e2e1"}`, borderRadius: "6px", cursor: "pointer", background: poFile ? "rgba(22,163,74,0.05)" : "white" }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: "20px", color: poFile ? "#16a34a" : "#666666" }}>
+                    {poFile ? "task" : "upload_file"}
+                  </span>
+                  <span style={{ fontSize: "13px", color: poFile ? "#333333" : "#999999", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {poFile ? poFile.name : "Upload the signed purchase order (PDF, image, or document)"}
+                  </span>
+                </label>
+                <input
+                  id="po-file"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  onChange={e => setPoFile(e.target.files?.[0] ?? null)}
+                  style={{ display: "none" }}
+                />
+              </div>
+              <p style={{ fontSize: "11px", color: "#999999", lineHeight: 1.5 }}>
+                A purchase order document is required for every vendor. Invoices from this vendor can only be uploaded once the purchase order exists, and their total may not exceed this value.
+              </p>
+            </div>
+            <div style={{ padding: "16px 24px", borderTop: "1px solid #e4e2e1", background: "#f8f8f8", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+              <button onClick={() => setShowAddVendor(false)} style={{ padding: "8px 20px", border: "1px solid #e4e2e1", borderRadius: "6px", background: "white", color: "#333333", fontWeight: "bold", cursor: "pointer", fontSize: "13px" }}>Cancel</button>
+              <button
+                onClick={submitVendor}
+                disabled={!vendorFormValid}
+                style={{ padding: "8px 24px", border: "none", borderRadius: "6px", background: vendorFormValid ? "#e30613" : "#f0bcc0", color: "white", fontWeight: "bold", cursor: vendorFormValid ? "pointer" : "not-allowed", fontSize: "13px" }}
+              >
+                Add Vendor
+              </button>
             </div>
           </div>
         </div>
