@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Auto-generated Prisma client — do not lint
+    "app/generated/**",
   ]),
+  // Rule overrides
+  {
+    rules: {
+      // setMounted(true) in useEffect is the standard SSR-safe portal pattern
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
