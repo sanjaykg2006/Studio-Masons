@@ -1,6 +1,6 @@
 "use client";
-import { useState, useTransition } from "react";
-import { inviteUser } from "./actions";
+import { useState, useTransition, useEffect } from "react";
+import { inviteUser, getMyProfile, listTeam, type Profile, type TeamMember } from "./actions";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
 
@@ -14,13 +14,15 @@ const roleEnum: Record<string, string> = {
   "Client": "CLIENT",
 };
 
-const teamMembers = [
-  { name: "Vikram R.", email: "vikram@studiomasons.in", role: "Site Engineer", status: "Active", avatar: "VR" },
-  { name: "Sneha P.", email: "sneha@studiomasons.in", role: "Project Manager", status: "Active", avatar: "SP" },
-  { name: "Amit S.", email: "amit@studiomasons.in", role: "Site Engineer", status: "Active", avatar: "AS" },
-  { name: "Rahul K.", email: "rahul@studiomasons.in", role: "Designer", status: "Active", avatar: "RK" },
-  { name: "Priya M.", email: "priya@studiomasons.in", role: "Finance", status: "Invited", avatar: "PM" },
-];
+// Reverse of roleEnum: Prisma Role enum value -> display label.
+const roleLabel: Record<string, string> = Object.fromEntries(
+  Object.entries(roleEnum).map(([label, value]) => [value, label])
+);
+
+function initials(value: string) {
+  const parts = value.replace(/@.*/, "").split(/[ .]+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
 
 const roles = ["Admin", "Project Manager", "Designer", "Site Engineer", "Finance", "Client"];
 
@@ -44,6 +46,14 @@ export default function SettingsPage() {
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [inviting, startInvite] = useTransition();
 
+  const [me, setMe] = useState<Profile | null>(null);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+
+  useEffect(() => {
+    getMyProfile().then(setMe);
+    listTeam().then(setTeam);
+  }, []);
+
   function handleInvite(formData: FormData) {
     setInviteMsg(null);
     startInvite(async () => {
@@ -51,6 +61,7 @@ export default function SettingsPage() {
       if (res.ok) {
         setInviteMsg({ ok: true, text: "Invitation sent." });
         setShowInvite(false);
+        listTeam().then(setTeam);
       } else {
         setInviteMsg({ ok: false, text: res.error });
       }
@@ -96,23 +107,30 @@ export default function SettingsPage() {
             </div>
             <div className="p-6 space-y-5">
               <div className="flex items-center gap-6 mb-6">
-                <div style={{width:"72px",height:"72px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",fontWeight:"bold",color:"white",flexShrink:0}}>SM</div>
+                <div style={{width:"72px",height:"72px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",fontWeight:"bold",color:"white",flexShrink:0}}>{me ? initials(me.name || me.email) : "—"}</div>
                 <div>
                   <button className="px-4 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-[#f8f8f8] transition-all mr-3">Change Photo</button>
                   <button className="px-4 py-2 text-[13px] font-bold text-[#ba1a1a] hover:underline">Remove</button>
                 </div>
               </div>
-              {[
-                { label: "Full Name", value: "Studio Masons Admin", type: "text" },
-                { label: "Email", value: "admin@studiomasons.in", type: "email" },
-                { label: "Phone", value: "+91 98765 43210", type: "tel" },
-                { label: "Designation", value: "Project Director", type: "text" },
-              ].map((f, i) => (
-                <div key={i} className="flex flex-col gap-2">
-                  <label className="text-[13px] font-bold text-[#e30613] uppercase">{f.label}</label>
-                  <input defaultValue={f.value} type={f.type} className="bg-white border border-[#e4e2e1] rounded p-3 text-[15px] focus:outline-none focus:border-[#e30613] transition-all" />
-                </div>
-              ))}
+              {me ? (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[13px] font-bold text-[#e30613] uppercase">Full Name</label>
+                    <input defaultValue={me.name} type="text" className="bg-white border border-[#e4e2e1] rounded p-3 text-[15px] focus:outline-none focus:border-[#e30613] transition-all" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[13px] font-bold text-[#e30613] uppercase">Email</label>
+                    <input value={me.email} type="email" readOnly className="bg-[#f8f8f8] border border-[#e4e2e1] rounded p-3 text-[15px] text-[#666666] focus:outline-none cursor-not-allowed" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[13px] font-bold text-[#e30613] uppercase">Role</label>
+                    <input value={roleLabel[me.role] ?? me.role} type="text" readOnly className="bg-[#f8f8f8] border border-[#e4e2e1] rounded p-3 text-[15px] text-[#666666] focus:outline-none cursor-not-allowed" />
+                  </div>
+                </>
+              ) : (
+                <p className="text-[#666666] text-[14px]">Loading your profile…</p>
+              )}
             </div>
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
               <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE CHANGES</button>
@@ -138,7 +156,7 @@ export default function SettingsPage() {
       {activeTab === 1 && (
         <div>
           <div className="flex justify-between items-center mb-6">
-            <p className="text-[#666666]">{teamMembers.length} members in your workspace</p>
+            <p className="text-[#666666]">{team.length} member{team.length !== 1 ? "s" : ""} in your workspace</p>
             <button onClick={() => { setInviteMsg(null); setShowInvite(true); }} className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
               <span className="material-symbols-outlined" style={{fontSize:"18px"}}>person_add</span> INVITE MEMBER
             </button>
@@ -158,17 +176,20 @@ export default function SettingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e4e2e1]">
-                {teamMembers.map((m, i) => (
-                  <tr key={i} className="hover:bg-[#f8f8f8] transition-colors">
+                {team.length === 0 && (
+                  <tr><td colSpan={5} className="px-6 py-10 text-center text-[#666666] text-[14px]">No team members yet. Use “Invite Member” to add someone.</td></tr>
+                )}
+                {team.map((m) => (
+                  <tr key={m.id} className="hover:bg-[#f8f8f8] transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div style={{width:"36px",height:"36px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"bold",color:"white",flexShrink:0}}>{m.avatar}</div>
+                        <div style={{width:"36px",height:"36px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:"bold",color:"white",flexShrink:0}}>{initials(m.name || m.email)}</div>
                         <span className="font-medium text-[#333333]">{m.name}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-[#666666] text-[14px]">{m.email}</td>
                     <td className="px-6 py-4">
-                      <select defaultValue={m.role} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613]">
+                      <select defaultValue={roleLabel[m.role] ?? m.role} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613]">
                         {roles.map(r => <option key={r}>{r}</option>)}
                       </select>
                     </td>

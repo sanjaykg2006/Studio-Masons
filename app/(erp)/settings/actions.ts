@@ -1,8 +1,49 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requireRole } from "@/lib/auth";
+import { requireRole, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/app/generated/prisma";
+
+export type Profile = { name: string; email: string; role: string };
+export type TeamMember = Profile & { id: string; status: "Active" | "Invited" };
+
+// The currently logged-in user's own profile (name/email/role from the DB row).
+export async function getMyProfile(): Promise<Profile | null> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return { name: user.name, email: user.email, role: user.role };
+}
+
+// All provisioned team members, with login status derived from Supabase Auth
+// (Active = has confirmed/signed in; Invited = invite not yet accepted).
+export async function listTeam(): Promise<TeamMember[]> {
+  const me = await getCurrentUser();
+  if (!me) return [];
+
+  const users = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+
+  let adminOk = false;
+  const confirmed = new Map<string, boolean>();
+  try {
+    const { data, error } = await createAdminClient().auth.admin.listUsers({ perPage: 1000 });
+    if (!error) {
+      adminOk = true;
+      for (const u of data.users) {
+        confirmed.set(u.id, Boolean(u.last_sign_in_at || u.email_confirmed_at));
+      }
+    }
+  } catch {
+    // If we can't reach the admin API, fall back to showing everyone as Active.
+  }
+
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: !adminOk || (u.supabaseId && confirmed.get(u.supabaseId)) ? "Active" : "Invited",
+  }));
+}
 
 export type InviteResult = { ok: true } | { ok: false; error: string };
 
