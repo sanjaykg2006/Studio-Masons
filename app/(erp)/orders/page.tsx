@@ -1,23 +1,21 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useProject } from "../../../contexts/ProjectContext";
+import { useProject, type Invoice, type PayReq, type InvStatus, type ReqStatus } from "../../../contexts/ProjectContext";
 
 // ── Types ─────────────────────────────────────────────────────────
-// Invoice workflow: vendor uploads → project team approves → payment request raised
-type InvStatus   = "Approval Pending" | "Approved" | "Rejected";
-// Payment request workflow: project team raises → accounts approves → accounts marks paid
-type ReqStatus   = "Pending Accounts Approval" | "Approved by Accounts" | "Paid";
+// Invoice & payment-request types now live in ProjectContext (shared + persisted).
 type ScopeStatus = "Not Started" | "In Progress" | "Completed" | "Delayed";
+// Site-expense approval workflow: site team logs → PM approves → billing approves → accounts approves & pays
+type ExpStatus = "Pending PM Approval" | "Pending Billing Approval" | "Pending Accounts Approval" | "Paid" | "Rejected";
 
-interface Invoice { id:string; vendor:string; project:string; amount:string; amountNum:number; due:string; status:InvStatus; flagged?:boolean; fileObj?:File; }
-interface PayReq  { id:string; vendor:string; project:string; amount:string; amountNum:number; requested:string; status:ReqStatus; notes?:string; invoiceFile?:File; invoiceRef?:string; }
-interface Expense { id:string; category:string; description:string; project:string; amount:string; amountNum:number; date:string; by:string; }
+interface Expense { id:string; category:string; description:string; project:string; amount:string; amountNum:number; date:string; by:string; fileObj?:File; status:ExpStatus; pmApprovedBy?:string; billingApprovedBy?:string; accountsApprovedBy?:string; }
 interface VScope  { id:string; vendor:string; project:string; scope:string; progress:number; status:ScopeStatus; dueDate:string; }
 
 // ── Status styles ─────────────────────────────────────────────────
 const INV_STYLE: Record<InvStatus, React.CSSProperties> = {
   "Approval Pending": { background:"rgba(202,138,4,0.08)",  color:"#a16207", borderColor:"rgba(202,138,4,0.25)" },
+  "PM Approved":      { background:"rgba(0,89,168,0.08)",   color:"#0059a8", borderColor:"rgba(0,89,168,0.25)" },
   "Approved":         { background:"rgba(34,197,94,0.08)",  color:"#16a34a", borderColor:"rgba(34,197,94,0.25)" },
   "Rejected":         { background:"rgba(186,26,26,0.08)",  color:"#ba1a1a", borderColor:"rgba(186,26,26,0.25)" },
 };
@@ -32,29 +30,26 @@ const SCOPE_STYLE: Record<ScopeStatus, React.CSSProperties> = {
   Completed:     { background:"rgba(34,197,94,0.08)",       color:"#16a34a", borderColor:"rgba(34,197,94,0.2)" },
   Delayed:       { background:"rgba(186,26,26,0.08)",       color:"#ba1a1a", borderColor:"rgba(186,26,26,0.2)" },
 };
+const PRIORITY_STYLE: Record<"Low" | "Medium" | "High", React.CSSProperties> = {
+  Low:    { background:"rgba(102,102,102,0.08)", color:"#666666", borderColor:"rgba(102,102,102,0.25)" },
+  Medium: { background:"rgba(202,138,4,0.08)",   color:"#a16207", borderColor:"rgba(202,138,4,0.25)" },
+  High:   { background:"rgba(227,6,19,0.08)",    color:"#e30613", borderColor:"rgba(227,6,19,0.25)" },
+};
+const EXP_STYLE: Record<ExpStatus, React.CSSProperties> = {
+  "Pending PM Approval":       { background:"rgba(202,138,4,0.08)", color:"#a16207", borderColor:"rgba(202,138,4,0.25)" },
+  "Pending Billing Approval":  { background:"rgba(0,89,168,0.08)",  color:"#0059a8", borderColor:"rgba(0,89,168,0.25)" },
+  "Pending Accounts Approval": { background:"rgba(147,51,234,0.08)",color:"#7e22ce", borderColor:"rgba(147,51,234,0.25)" },
+  "Paid":                      { background:"rgba(34,197,94,0.08)", color:"#16a34a", borderColor:"rgba(34,197,94,0.25)" },
+  "Rejected":                  { background:"rgba(186,26,26,0.08)", color:"#ba1a1a", borderColor:"rgba(186,26,26,0.25)" },
+};
 
 // ── Initial data ──────────────────────────────────────────────────
-const initInvoices: Invoice[] = [
-  { id:"SM-INV-4902", vendor:"Blackwood Stonemasons Ltd.", project:"Indiranagar Residence", amount:"₹14,250", amountNum:14250, due:"Oct 24, 2023", status:"Approval Pending" },
-  { id:"SM-INV-4899", vendor:"Imperial Steel Works",       project:"Whitefield Office",     amount:"₹8,900",  amountNum:8900,  due:"Oct 22, 2023", status:"Approved" },
-  { id:"SM-INV-4885", vendor:"Glass & Light Studios",      project:"Koramangala Villa",     amount:"₹11,420", amountNum:11420, due:"Oct 15, 2023", status:"Rejected" },
-  { id:"SM-INV-4872", vendor:"Oak & Grain Joinery",        project:"Indiranagar Residence", amount:"₹6,750",  amountNum:6750,  due:"Oct 12, 2023", status:"Approved" },
-  { id:"SM-INV-4850", vendor:"Elite Electrical Solutions", project:"HSR Layout G+3",        amount:"₹4,300",  amountNum:4300,  due:"Oct 08, 2023", status:"Approved" },
-  { id:"SM-INV-4833", vendor:"Premier Tiling Co.",         project:"Koramangala Villa",     amount:"₹9,800",  amountNum:9800,  due:"Oct 05, 2023", status:"Approval Pending" },
-  { id:"SM-INV-4820", vendor:"Blackwood Stonemasons Ltd.", project:"HSR Layout G+3",        amount:"₹7,100",  amountNum:7100,  due:"Oct 02, 2023", status:"Approved" },
-];
-const initRequests: PayReq[] = [
-  { id:"PR-001", vendor:"Blackwood Stonemasons Ltd.", project:"Indiranagar Residence", amount:"₹8,500",  amountNum:8500,  requested:"Nov 05, 2024", status:"Pending Accounts Approval", notes:"Advance for stone cladding – phase 2 materials", invoiceRef:"SM-INV-4899" },
-  { id:"PR-002", vendor:"Imperial Steel Works",       project:"Whitefield Office",     amount:"₹12,300", amountNum:12300, requested:"Nov 03, 2024", status:"Approved by Accounts" },
-  { id:"PR-003", vendor:"Glass & Light Studios",      project:"Koramangala Villa",     amount:"₹3,200",  amountNum:3200,  requested:"Oct 29, 2024", status:"Paid" },
-  { id:"PR-004", vendor:"Elite Electrical Solutions", project:"HSR Layout G+3",        amount:"₹5,600",  amountNum:5600,  requested:"Oct 25, 2024", status:"Pending Accounts Approval", invoiceRef:"SM-INV-4850" },
-];
 const initExpenses: Expense[] = [
-  { id:"EXP-001", category:"Materials",      description:"Cement bags – 120 units",         project:"Indiranagar Residence", amount:"₹6,000",  amountNum:6000,  date:"Nov 08, 2024", by:"Vikram R." },
-  { id:"EXP-002", category:"Labor",          description:"Daily labor – 12 workers × 3 days",project:"Whitefield Office",    amount:"₹7,200",  amountNum:7200,  date:"Nov 07, 2024", by:"Sneha P." },
-  { id:"EXP-003", category:"Equipment",      description:"Scaffolding rental – 2 weeks",    project:"Koramangala Villa",     amount:"₹4,500",  amountNum:4500,  date:"Nov 06, 2024", by:"Amit S." },
-  { id:"EXP-004", category:"Miscellaneous",  description:"Site permits and fees",            project:"HSR Layout G+3",        amount:"₹1,800",  amountNum:1800,  date:"Nov 05, 2024", by:"Rahul K." },
-  { id:"EXP-005", category:"Materials",      description:"Reinforcement bars – 5 MT",       project:"Indiranagar Residence", amount:"₹18,500", amountNum:18500, date:"Nov 04, 2024", by:"Vikram R." },
+  { id:"EXP-001", category:"Materials",      description:"Cement bags – 120 units",         project:"Indiranagar Residence", amount:"₹6,000",  amountNum:6000,  date:"Nov 08, 2024", by:"Vikram R.", status:"Paid", pmApprovedBy:"Vikram R.", billingApprovedBy:"Meera D.", accountsApprovedBy:"Arjun K." },
+  { id:"EXP-002", category:"Labor",          description:"Daily labor – 12 workers × 3 days",project:"Whitefield Office",    amount:"₹7,200",  amountNum:7200,  date:"Nov 07, 2024", by:"Sneha P.", status:"Pending Accounts Approval", pmApprovedBy:"Sneha P.", billingApprovedBy:"Meera D." },
+  { id:"EXP-003", category:"Equipment",      description:"Scaffolding rental – 2 weeks",    project:"Koramangala Villa",     amount:"₹4,500",  amountNum:4500,  date:"Nov 06, 2024", by:"Amit S.", status:"Pending Billing Approval", pmApprovedBy:"Amit S." },
+  { id:"EXP-004", category:"Miscellaneous",  description:"Site permits and fees",            project:"HSR Layout G+3",        amount:"₹1,800",  amountNum:1800,  date:"Nov 05, 2024", by:"Rahul K.", status:"Pending PM Approval" },
+  { id:"EXP-005", category:"Materials",      description:"Reinforcement bars – 5 MT",       project:"Indiranagar Residence", amount:"₹18,500", amountNum:18500, date:"Nov 04, 2024", by:"Vikram R.", status:"Pending PM Approval" },
 ];
 const initScope: VScope[] = [
   { id:"VS-001", vendor:"Blackwood Stonemasons Ltd.", project:"Indiranagar Residence", scope:"Stone cladding – main facade (Ground + 2 floors)", progress:65, status:"In Progress",  dueDate:"Dec 15, 2024" },
@@ -77,11 +72,9 @@ function badge(label: string, style: React.CSSProperties) {
 
 // ── Main component ────────────────────────────────────────────────
 export default function OrdersPage() {
-  const { selectedProject, getProjectVendorPOs, getVendorPO } = useProject();
+  const { selectedProject, getProjectVendorPOs, getVendorPO, consumeAdvance, invoices, setInvoices, requests, setRequests, logActivity } = useProject();
 
   const [activeTab, setActiveTab] = useState(0);
-  const [invoices, setInvoices]   = useState<Invoice[]>(initInvoices);
-  const [requests, setRequests]   = useState<PayReq[]>(initRequests);
   const [expenses, setExpenses]   = useState<Expense[]>(initExpenses);
   const [scope, setScope]         = useState<VScope[]>(initScope);
 
@@ -116,9 +109,47 @@ export default function OrdersPage() {
   const prFileRef = useRef<HTMLInputElement>(null);
   const [prFile, setPrFile] = useState<File | null>(null);
 
+  // New request - site expense voucher file (required)
+  const expenseFileRef = useRef<HTMLInputElement>(null);
+  const [expenseFile, setExpenseFile] = useState<File | null>(null);
+
+  // Site expense voucher file preview
+  const [viewExpenseVoucher, setViewExpenseVoucher] = useState<Expense | null>(null);
+  const [voucherPreviewUrl, setVoucherPreviewUrl] = useState<string | null>(null);
+
+  // Approve invoice modal states
+  const [approvingInvId, setApprovingInvId] = useState<string | null>(null);
+  const [approveRemarks, setApproveRemarks] = useState("");
+  const [approveBy, setApproveBy] = useState("Arjun K.");
+  const [approveTdsPct, setApproveTdsPct] = useState<number>(2);
+  // GST confirmed / adjusted by accounts at approval — drives the invoice total.
+  const [approveSgstPct, setApproveSgstPct] = useState<number>(9);
+  const [approveCgstPct, setApproveCgstPct] = useState<number>(9);
+  const [approveIgstPct, setApproveIgstPct] = useState<number>(0);
+  const [deductFromAdvance, setDeductFromAdvance] = useState(false);
+  const [advanceDeductAmt, setAdvanceDeductAmt] = useState("0");
+  const [holdRetention, setHoldRetention] = useState(false);
+  const [amountPayable, setAmountPayable] = useState("0");
+
+  // Raise payment request from invoice states
+  const [raisingReqInv, setRaisingReqInv] = useState<Invoice | null>(null);
+  const [reqValInput, setReqValInput] = useState("");
+  const [reqRemarks, setReqRemarks] = useState("");
+  const [reqPriority, setReqPriority] = useState<"Low" | "Medium" | "High">("Medium");
+
   // More-vert row menus
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Generic "who is approving?" confirmation. Used by invoice PM approval,
+  // payment-request approval/payment, and expense PM/Billing/Accounts approval.
+  const [confirmAction, setConfirmAction] = useState<{ title:string; label:string; cta:string; run:(name:string)=>void } | null>(null);
+  const [confirmName, setConfirmName] = useState("");
+  function askApprover(opts: { title:string; label:string; cta:string; defaultName:string; run:(name:string)=>void }) {
+    setConfirmName(opts.defaultName);
+    setConfirmAction({ title:opts.title, label:opts.label, cta:opts.cta, run:opts.run });
+    setOpenMenu(null);
+  }
 
   // New Request modal
   const [showNew, setShowNew]       = useState(false);
@@ -142,7 +173,7 @@ export default function OrdersPage() {
 
   // Blob URL for invoice file in slide-over
   useEffect(() => {
-    if (slideInv?.fileObj) {
+    if (slideInv?.fileObj instanceof Blob) {
       const url = URL.createObjectURL(slideInv.fileObj);
       setInvPreviewUrl(url);
       return () => { URL.revokeObjectURL(url); setInvPreviewUrl(null); };
@@ -152,13 +183,66 @@ export default function OrdersPage() {
 
   // Blob URL for payment request invoice file
   useEffect(() => {
-    if (viewReqInvoice?.invoiceFile) {
+    if (viewReqInvoice?.invoiceFile instanceof Blob) {
       const url = URL.createObjectURL(viewReqInvoice.invoiceFile);
       setReqPreviewUrl(url);
       return () => { URL.revokeObjectURL(url); setReqPreviewUrl(null); };
     }
     setReqPreviewUrl(null);
   }, [viewReqInvoice]);
+
+  // Blob URL for site expense voucher file
+  useEffect(() => {
+    if (viewExpenseVoucher?.fileObj instanceof Blob) {
+      const url = URL.createObjectURL(viewExpenseVoucher.fileObj);
+      setVoucherPreviewUrl(url);
+      return () => { URL.revokeObjectURL(url); setVoucherPreviewUrl(null); };
+    }
+    setVoucherPreviewUrl(null);
+  }, [viewExpenseVoucher]);
+
+  // Reset the approve modal whenever it opens.
+  useEffect(() => {
+    if (approvingInvId) {
+      const inv = invoices.find(x => x.id === approvingInvId);
+      if (inv) {
+        setApproveRemarks("");
+        setApproveBy("Arjun K.");
+        setApproveTdsPct(2);
+        setApproveSgstPct(inv.sgstPct ?? 9);
+        setApproveCgstPct(inv.cgstPct ?? 9);
+        setApproveIgstPct(inv.igstPct ?? 0);
+        setDeductFromAdvance(false);
+        setAdvanceDeductAmt("0");
+        setHoldRetention(false);
+        setAmountPayable(String(inv.amountNum));
+      }
+    }
+  }, [approvingInvId, invoices]);
+
+  // Recompute amount payable: total − advance deducted − TDS (on amount after advance) − 5% retention.
+  useEffect(() => {
+    if (!approvingInvId) return;
+    const inv = invoices.find(x => x.id === approvingInvId);
+    if (!inv) return;
+    const base         = inv.baseValue ?? inv.amountNum;
+    const total        = base + (base * (approveSgstPct + approveCgstPct + approveIgstPct)) / 100;
+    const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, vendorAdvanceRemaining(inv.vendor)) : 0;
+    const afterAdvance = Math.max(0, total - deduct);
+    const tdsAmount    = afterAdvance * approveTdsPct / 100;
+    const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+    setAmountPayable(String(Math.max(0, afterAdvance - tdsAmount - retentionAmt)));
+  }, [approveSgstPct, approveCgstPct, approveIgstPct, approveTdsPct, deductFromAdvance, advanceDeductAmt, holdRetention, approvingInvId, invoices]);
+
+  // Effect to sync Raise Payment Request Modal values
+  useEffect(() => {
+    if (raisingReqInv) {
+      const remaining = invoiceRemaining(raisingReqInv);
+      setReqValInput(String(remaining));
+      setReqRemarks(`Payment request for invoice ${raisingReqInv.id}`);
+      setReqPriority("Medium");
+    }
+  }, [raisingReqInv]);
 
   // ── Filtered data ──────────────────────────────────────────────
   const proj = selectedProject?.name;
@@ -178,13 +262,70 @@ export default function OrdersPage() {
   }
 
   // ── Actions ────────────────────────────────────────────────────
-  function approveInvoice(id: string) {
-    setInvoices(prev => prev.map(x => x.id === id ? { ...x, status: "Approved" } : x));
+  // Stage 1 — project manager approves the uploaded invoice.
+  function pmApproveInvoice(id: string, by: string) {
+    setInvoices(prev => prev.map(x => x.id === id ? { ...x, status: "PM Approved", pmApprovedAt: new Date().toISOString().slice(0, 10), pmApprovedBy: by } : x));
     setOpenMenu(null);
+    const inv = invoices.find(x => x.id === id);
+    if (inv) logActivity({ icon: "fact_check", color: "#0059a8", route: "/orders", text: "Invoice PM-approved for", bold: inv.project, detail: `Invoice ${inv.id} from ${inv.vendor} (${inv.amount}) approved by ${by} (PM) — awaiting accounts.` });
+  }
+  // Open the "who is approving?" prompt for an invoice PM approval.
+  function askPmApproveInvoice(inv: Invoice) {
+    askApprover({ title:`Approve invoice ${inv.id}`, label:"PM Approver Name", cta:"Approve (PM)", defaultName: selectedProject?.engineer ?? "", run:(name)=>pmApproveInvoice(inv.id, name) });
+  }
+  // Stage 2 — accounts approve (opens the TDS / advance / retention modal).
+  function approveInvoice(id: string) {
+    setApprovingInvId(id);
+    setOpenMenu(null);
+  }
+  // Days elapsed since PM approval — the "overdue" clock starts then.
+  function getOverdueDays(pmApprovedAt?: string): number | null {
+    if (!pmApprovedAt) return null;
+    const diff = Math.floor((Date.now() - new Date(pmApprovedAt).getTime()) / 86400000);
+    return Math.max(0, diff);
+  }
+  function submitApproveInvoice() {
+    if (!approvingInvId) return;
+    const inv = invoices.find(x => x.id === approvingInvId);
+    if (!inv) return;
+    const base         = inv.baseValue ?? inv.amountNum;
+    const total        = base + (base * (approveSgstPct + approveCgstPct + approveIgstPct)) / 100;
+    const payVal       = parseFloat(amountPayable || "0");
+    const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, vendorAdvanceRemaining(inv.vendor)) : 0;
+    const afterAdvance = Math.max(0, total - deduct);
+    const tdsAmount    = afterAdvance * approveTdsPct / 100;
+    const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+
+    setInvoices(prev => prev.map(x => x.id === approvingInvId ? {
+      ...x,
+      status: "Approved",
+      remarks: approveRemarks,
+      accountsApprovedBy: approveBy,
+      sgstPct: approveSgstPct,
+      cgstPct: approveCgstPct,
+      igstPct: approveIgstPct,
+      amount: `₹${total.toLocaleString("en-IN")}`,
+      amountNum: total,
+      tdsPct: approveTdsPct,
+      advanceDeducted: deduct,
+      retentionHeld: holdRetention,
+      retentionAmount: retentionAmt,
+      amountPayable: payVal,
+      requestedAmount: 0
+    } : x));
+
+    // Record advance consumed against the vendor's PO.
+    if (deduct > 0 && selectedProject) {
+      consumeAdvance({ projectId: selectedProject.id, vendorName: inv.vendor, amount: deduct });
+    }
+    logActivity({ icon: "verified", color: "#16a34a", route: "/orders", text: "Invoice approved for", bold: inv.project, detail: `Invoice ${inv.id} from ${inv.vendor} approved by ${approveBy} (accounts) — ₹${payVal.toLocaleString("en-IN")} payable${deduct > 0 ? `, ₹${deduct.toLocaleString("en-IN")} adjusted from advance` : ""}.` });
+    setApprovingInvId(null);
   }
   function rejectInvoice(id: string) {
     setInvoices(prev => prev.map(x => x.id === id ? { ...x, status: "Rejected" } : x));
     setOpenMenu(null);
+    const inv = invoices.find(x => x.id === id);
+    if (inv) logActivity({ icon: "block", color: "#ba1a1a", route: "/orders", text: "Invoice rejected for", bold: inv.project, detail: `Invoice ${inv.id} from ${inv.vendor} (${inv.amount}) was rejected.` });
   }
   function flagInvoice(id: string) {
     setInvoices(prev => prev.map(x => x.id === id ? { ...x, flagged: !x.flagged } : x));
@@ -195,28 +336,61 @@ export default function OrdersPage() {
     if (slideInvId === id) setSlideInvId(null);
   }
   // Payment request accounts actions
-  function approveReqByAccounts(id: string) {
-    setRequests(prev => prev.map(x => x.id === id ? { ...x, status: "Approved by Accounts" } : x));
+  function approveReqByAccounts(id: string, by: string) {
+    setRequests(prev => prev.map(x => x.id === id ? { ...x, status: "Approved by Accounts", accountsApprovedBy: by } : x));
+    const r = requests.find(x => x.id === id);
+    if (r) logActivity({ icon: "price_check", color: "#16a34a", route: "/orders", text: "Payment request approved for", bold: r.project, detail: `Payment request ${r.id} for ${r.vendor} (${r.amount}) approved by ${by} (accounts) — ready to pay.` });
   }
-  function markReqPaid(id: string) {
-    setRequests(prev => prev.map(x => x.id === id ? { ...x, status: "Paid" } : x));
+  function markReqPaid(id: string, by: string) {
+    setRequests(prev => prev.map(x => x.id === id ? { ...x, status: "Paid", paidBy: by } : x));
+    const r = requests.find(x => x.id === id);
+    if (r) logActivity({ icon: "payments", color: "#0059a8", route: "/orders", text: "Payment marked paid for", bold: r.project, detail: `Payment request ${r.id} for ${r.vendor} (${r.amount}) marked as paid by ${by}.` });
+  }
+  // Approved-but-not-yet-consumed advance available to deduct from a vendor's invoice.
+  function vendorAdvanceRemaining(vendorName: string): number {
+    const po = selectedProject ? getVendorPO(selectedProject.id, vendorName) : undefined;
+    if (!po?.advanceApproved) return 0;
+    return Math.max(0, (po.advanceRequested ?? 0) - (po.advanceConsumed ?? 0));
+  }
+  // Remaining payable that can still be requested for an approved invoice. The amount
+  // payable already nets advance + TDS + retention, so held retention is not requestable.
+  function invoiceRemaining(inv: Invoice) {
+    const payable = inv.amountPayable ?? inv.amountNum;
+    return payable - (inv.requestedAmount ?? 0);
   }
   function raiseFromInvoice(inv: Invoice) {
-    // Only allowed when project team has approved the invoice
-    if (inv.status !== "Approved") return;
-    setActiveTab(1);
-    setNewForm({
-      vendor:     inv.vendor,
-      project:    inv.project,
-      amount:     String(inv.amountNum),
-      notes:      `Payment request for invoice ${inv.id}`,
-      invoiceRef: inv.id,
-    });
-    // Copy the invoice file so accounts can review it
-    if (inv.fileObj) setPrFile(inv.fileObj);
-    setShowNew(true);
+    // Only allowed when project team has approved the invoice and budget remains
+    if (inv.status !== "Approved" || invoiceRemaining(inv) <= 0) return;
+    setRaisingReqInv(inv);
     setOpenMenu(null);
     setSlideInvId(null);
+  }
+  function submitRaiseRequest() {
+    if (!raisingReqInv) return;
+    const inv = raisingReqInv;
+    const remaining = invoiceRemaining(inv);
+    const val = parseFloat(reqValInput || "0");
+    // Requested amount must be positive and within the remaining payable.
+    if (!(val > 0) || val > remaining) return;
+
+    const n: PayReq = {
+      id: `PR-${String(requests.length + 1).padStart(3, "0")}`,
+      vendor: inv.vendor,
+      project: inv.project,
+      amount: `₹${val.toLocaleString("en-IN")}`,
+      amountNum: val,
+      requested: new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }),
+      status: "Pending Accounts Approval",
+      notes: reqRemarks,
+      invoiceFile: inv.fileObj,
+      invoiceRef: inv.id,
+      priority: reqPriority,
+    };
+    setRequests(prev => [n, ...prev]);
+    // Bump the cumulative requested amount on the parent invoice.
+    setInvoices(prev => prev.map(x => x.id === inv.id ? { ...x, requestedAmount: (x.requestedAmount ?? 0) + val } : x));
+    logActivity({ icon: "request_quote", color: "#e30613", route: "/orders", text: "Payment request raised for", bold: inv.project, detail: `Payment request ${n.id} for ${inv.vendor} (₹${val.toLocaleString("en-IN")}) raised against invoice ${inv.id}.` });
+    setRaisingReqInv(null);
   }
 
   function updateScopeProgress(id: string, pct: number) {
@@ -229,6 +403,33 @@ export default function OrdersPage() {
     setExpenses(prev => prev.filter(x => x.id !== id));
     setOpenMenu(null);
   }
+  // Site-expense approval chain: PM → Billing → Accounts (paid). Each stage records the approver.
+  function advanceExpense(id: string, stage: "pm" | "billing" | "accounts", by: string) {
+    setExpenses(prev => prev.map(x => {
+      if (x.id !== id) return x;
+      if (stage === "pm")      return { ...x, status: "Pending Billing Approval", pmApprovedBy: by };
+      if (stage === "billing") return { ...x, status: "Pending Accounts Approval", billingApprovedBy: by };
+      return { ...x, status: "Paid", accountsApprovedBy: by };
+    }));
+    const exp = expenses.find(x => x.id === id);
+    if (exp) {
+      const label = stage === "pm" ? "PM-approved" : stage === "billing" ? "billing-approved" : "approved & paid by accounts";
+      logActivity({ icon: stage === "accounts" ? "payments" : "fact_check", color: stage === "accounts" ? "#16a34a" : "#0059a8", route: "/orders", text: `Site expense ${label} for`, bold: exp.project, detail: `Expense ${exp.id} (${exp.amount}) ${label} by ${by} — ${exp.description}.` });
+    }
+  }
+  function rejectExpense(id: string) {
+    setExpenses(prev => prev.map(x => x.id === id ? { ...x, status: "Rejected" } : x));
+    setOpenMenu(null);
+  }
+  // Open the approver prompt for the expense's current stage.
+  function askApproveExpense(exp: Expense) {
+    if (exp.status === "Pending PM Approval")
+      askApprover({ title:`Approve expense ${exp.id}`, label:"PM Approver Name", cta:"Approve (PM)", defaultName: selectedProject?.engineer ?? "", run:(name)=>advanceExpense(exp.id, "pm", name) });
+    else if (exp.status === "Pending Billing Approval")
+      askApprover({ title:`Approve expense ${exp.id}`, label:"Billing Approver Name", cta:"Approve (Billing)", defaultName:"Meera D.", run:(name)=>advanceExpense(exp.id, "billing", name) });
+    else if (exp.status === "Pending Accounts Approval")
+      askApprover({ title:`Approve & pay expense ${exp.id}`, label:"Accounts Approver Name", cta:"Approve & Pay", defaultName:"Arjun K.", run:(name)=>advanceExpense(exp.id, "accounts", name) });
+  }
 
   function exportCsv() {
     const headers = ["Invoice ID","Vendor","Project","Amount","Due Date","Status"];
@@ -240,11 +441,20 @@ export default function OrdersPage() {
     a.click();
   }
 
-  // Cumulative invoiced amount for a vendor on a project (rejected invoices don't consume the PO).
+  function closeNewModal() {
+    setShowNew(false);
+    setUploadError(null);
+    setNewInvFile(null);
+    setExpenseFile(null);
+  }
+
+  // Cumulative base value (pre-GST) invoiced for a vendor on a project — PO utilization
+  // is measured against the base value, not the GST-inclusive total. Rejected invoices
+  // don't consume the PO.
   function vendorInvoiceTotal(vendorName: string, projectName: string) {
     return invoices
       .filter(i => i.project === projectName && i.vendor === vendorName && i.status !== "Rejected")
-      .reduce((s, i) => s + i.amountNum, 0);
+      .reduce((s, i) => s + (i.baseValue ?? i.amountNum), 0);
   }
 
   function submitNew() {
@@ -260,19 +470,39 @@ export default function OrdersPage() {
         return;
       }
 
-      // Gate 2 — the invoice amount is needed to enforce the PO cap.
-      const amt = parseFloat(newForm.amount || "0");
+      // Gate 2 — fixed contract period: the invoice date must fall inside the contract window.
+      if (po.fixedContract) {
+        const invDate = newForm.due || "";
+        if (!invDate) {
+          setUploadError(`${vendorName} has a fixed contract period — enter the invoice date so it can be checked against the contract window.`);
+          return;
+        }
+        if ((po.contractStart && invDate < po.contractStart) || (po.contractEnd && invDate > po.contractEnd)) {
+          setUploadError(
+            `Invoice date ${invDate} is outside ${vendorName}'s fixed contract period ` +
+            `(${po.contractStart ?? "—"} to ${po.contractEnd ?? "—"}). Invoices can only be filed within this window.`
+          );
+          return;
+        }
+      }
+
+      // Gate 3 — the invoice amount is needed to enforce the PO cap.
+      const baseVal = parseFloat(newForm.baseValue || "0");
+      const sgstPct = parseFloat(newForm.sgstPct || "9");
+      const cgstPct = parseFloat(newForm.cgstPct || "9");
+      const igstPct = parseFloat(newForm.igstPct || "0");
+      const amt = baseVal + (baseVal * (sgstPct + cgstPct + igstPct)) / 100;
       if (!amt || amt <= 0) {
-        setUploadError("Enter the invoice amount so it can be checked against the purchase order.");
+        setUploadError("Enter a valid base value so the total amount can be checked against the purchase order.");
         return;
       }
 
-      // Gate 3 — cumulative invoices must stay within the purchase order value.
+      // Gate 4 — cumulative base value must stay within the purchase order value (GST excluded).
       const already = vendorInvoiceTotal(vendorName, projectName);
-      if (already + amt > po.poValue) {
+      if (already + baseVal > po.poValue) {
         const remaining = po.poValue - already;
         setUploadError(
-          `Invoice rejected — it would push total invoices for ${vendorName} to ₹${(already + amt).toLocaleString("en-IN")}, ` +
+          `Invoice rejected — it would push the total base value for ${vendorName} to ₹${(already + baseVal).toLocaleString("en-IN")}, ` +
           `over the purchase order of ₹${po.poValue.toLocaleString("en-IN")} (₹${already.toLocaleString("en-IN")} already invoiced, ` +
           `₹${Math.max(0, remaining).toLocaleString("en-IN")} remaining).`
         );
@@ -288,10 +518,16 @@ export default function OrdersPage() {
         due: newForm.due || "TBD",
         status: "Approval Pending",
         fileObj: newInvFile,
+        baseValue: baseVal,
+        sgstPct: sgstPct,
+        cgstPct: cgstPct,
+        igstPct: igstPct,
+        requestedAmount: 0,
       };
       setInvoices(prev => [n, ...prev]);
       setNewInvFile(null);
       setUploadError(null);
+      logActivity({ icon: "cloud_upload", color: "#e30613", route: "/orders", text: "Invoice submitted for", bold: projectName, detail: `Invoice ${n.id} from ${vendorName} for ${n.amount} uploaded — awaiting project-manager approval.` });
     } else if (activeTab === 1) {
       const n: PayReq = {
         id: `PR-${String(requests.length + 1).padStart(3, "0")}`,
@@ -308,17 +544,22 @@ export default function OrdersPage() {
       setRequests(prev => [n, ...prev]);
       setPrFile(null);
     } else if (activeTab === 2) {
+      const amt = parseFloat(newForm.amount || "0");
       const n: Expense = {
         id: `EXP-${String(expenses.length + 1).padStart(3, "0")}`,
         category: newForm.category || "Miscellaneous",
         description: newForm.description || "—",
         project: newForm.project || proj || "General",
-        amount: `₹${newForm.amount || "0"}`,
-        amountNum: parseFloat(newForm.amount || "0"),
+        amount: `₹${amt.toLocaleString("en-IN")}`,
+        amountNum: amt,
         date: new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }),
         by: "You",
+        fileObj: expenseFile ?? undefined,
+        status: "Pending PM Approval",
       };
       setExpenses(prev => [n, ...prev]);
+      setExpenseFile(null);
+      logActivity({ icon: "receipt_long", color: "#e30613", route: "/orders", text: "Site expense logged for", bold: n.project, detail: `${n.category} expense of ${n.amount} recorded — ${n.description}.` });
     } else {
       const n: VScope = {
         id: `VS-${String(scope.length + 1).padStart(3, "0")}`,
@@ -433,7 +674,7 @@ export default function OrdersPage() {
             Export CSV
           </button>
           {/* Hide New Request on Tab 1 — payment requests come from invoices only */}
-          {activeTab !== 1 && <button onClick={() => { setNewForm({}); setNewInvFile(null); setUploadError(null); setShowNew(true); }}
+          {activeTab !== 1 && <button onClick={() => { setNewForm({}); setNewInvFile(null); setExpenseFile(null); setUploadError(null); setShowNew(true); }}
             style={{ padding:"10px 20px", border:"none", borderRadius:"8px", background:"#e30613", color:"white", fontSize:"13px", fontWeight:"bold", cursor:"pointer", display:"flex", alignItems:"center", gap:"6px" }}
             onMouseEnter={e => { e.currentTarget.style.opacity="0.88"; }}
             onMouseLeave={e => { e.currentTarget.style.opacity="1"; }}>
@@ -527,7 +768,7 @@ export default function OrdersPage() {
                 <table style={{ width:"100%", borderCollapse:"collapse" }}>
                   <thead>
                     <tr style={{ background:"#f8f8f8", borderBottom:"1px solid #e4e2e1" }}>
-                      {["Invoice ID","Vendor","Project","Amount","PO Utilization","Due Date","Status","Actions"].map((h,i) => (
+                      {["Invoice ID","Vendor","Project","Amount","PO Utilization","Overdue Days","Status","Actions"].map((h,i) => (
                         <th key={h} style={{ padding:"14px 20px", fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#666666", textAlign: i===3?"right":"left" }}>{h}</th>
                       ))}
                     </tr>
@@ -545,7 +786,16 @@ export default function OrdersPage() {
                         </td>
                         <td style={{ padding:"14px 20px", fontSize:"13px", color:"#333333" }}>{inv.vendor}</td>
                         <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{inv.project}</td>
-                        <td style={{ padding:"14px 20px", fontSize:"13px", fontWeight:"600", color:"#333333", textAlign:"right" }}>{inv.amount}</td>
+                        <td style={{ padding:"14px 20px", textAlign:"right" }}>
+                          {inv.status === "Approved" && inv.amountPayable != null ? (
+                            <div style={{ display:"flex", flexDirection:"column", gap:"2px", alignItems:"flex-end" }}>
+                              <span style={{ fontSize:"13px", fontWeight:"600", color:"#16a34a" }}>₹{inv.amountPayable.toLocaleString("en-IN")}</span>
+                              <span style={{ fontSize:"10px", color:"#999999" }}>Invoice {inv.amount}</span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize:"13px", fontWeight:"600", color:"#333333" }}>{inv.amount}</span>
+                          )}
+                        </td>
                         <td style={{ padding:"14px 20px", minWidth:"170px" }}>
                           {(() => {
                             const po = selectedProject ? getVendorPO(selectedProject.id, inv.vendor) : undefined;
@@ -569,15 +819,35 @@ export default function OrdersPage() {
                             );
                           })()}
                         </td>
-                        <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{inv.due}</td>
+                        <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>
+                          {(() => {
+                            const od = getOverdueDays(inv.pmApprovedAt);
+                            return od == null
+                              ? <span style={{ color:"#cccccc" }}>—</span>
+                              : <span style={{ fontWeight:"bold", color: od > 0 ? "#a16207" : "#666666" }}>{od} {od === 1 ? "day" : "days"}</span>;
+                          })()}
+                        </td>
                         <td style={{ padding:"14px 20px" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:"4px", alignItems:"flex-start" }}>
                             {badge(inv.status, INV_STYLE[inv.status])}
-                            {requests.some(r => r.invoiceRef === inv.id) && (
-                              <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.05em", color:"#16a34a", display:"flex", alignItems:"center", gap:"3px" }}>
-                                <span className="material-symbols-outlined" style={{ fontSize:"11px" }}>link</span>Request raised
-                              </span>
-                            )}
+                            {inv.pmApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>PM: {inv.pmApprovedBy}</span>}
+                            {inv.accountsApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>Accounts: {inv.accountsApprovedBy}</span>}
+                            {inv.status === "Approved" && inv.amountPayable != null && (() => {
+                              const payable   = inv.amountPayable ?? inv.amountNum;
+                              const requested = inv.requestedAmount ?? 0;
+                              const remaining = payable - requested;
+                              const pct       = payable > 0 ? Math.min(100, (requested / payable) * 100) : 0;
+                              return (
+                                <div style={{ display:"flex", flexDirection:"column", gap:"3px", width:"150px" }}>
+                                  <div style={{ height:"4px", width:"100%", background:"#e4e2e1", borderRadius:"2px", overflow:"hidden" }}>
+                                    <div style={{ height:"100%", width:`${pct}%`, background: remaining <= 0 ? "#16a34a" : "#0059a8", transition:"width 0.3s" }} />
+                                  </div>
+                                  <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.05em", color: remaining <= 0 ? "#16a34a" : "#999999" }}>
+                                    {remaining <= 0 ? "Fully requested" : `₹${requested.toLocaleString("en-IN")} req · ₹${remaining.toLocaleString("en-IN")} left`}
+                                  </span>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </td>
                         <td style={{ padding:"14px 20px" }} onClick={e => e.stopPropagation()}>
@@ -589,19 +859,19 @@ export default function OrdersPage() {
                               <span className="material-symbols-outlined" style={{ fontSize:"16px", color:"#666666" }}>more_vert</span>
                             </button>
                             {openMenu===inv.id && (() => {
-                              const alreadyRaised = requests.some(r => r.invoiceRef === inv.id);
+                              const fullyRequested = inv.status === "Approved" && invoiceRemaining(inv) <= 0;
                               return (
                                 <div style={{ position:"absolute", right:0, ...(rowIdx >= slice.length-2 ? {bottom:"100%",marginBottom:"4px"}:{top:"100%",marginTop:"4px"}), background:"white", border:"1px solid #e4e2e1", borderRadius:"8px", boxShadow:"0 8px 24px rgba(0,0,0,0.12)", zIndex:70, minWidth:"200px", overflow:"hidden" }}>
                                   <button onClick={() => { setSlideInvId(inv.id); setOpenMenu(null); }} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#333333", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
                                     onMouseEnter={e=>{e.currentTarget.style.background="#f8f8f8";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
                                     <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>open_in_new</span> View Details
                                   </button>
-                                  {/* Project team approval — only while pending */}
+                                  {/* Stage 1 — project manager approval */}
                                   {inv.status === "Approval Pending" && (
                                     <>
-                                      <button onClick={() => approveInvoice(inv.id)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#16a34a", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
-                                        onMouseEnter={e=>{e.currentTarget.style.background="#f0fdf4";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
-                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>verified</span> Approve Invoice
+                                      <button onClick={() => askPmApproveInvoice(inv)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#0059a8", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
+                                        onMouseEnter={e=>{e.currentTarget.style.background="#eff6ff";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
+                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>fact_check</span> Approve (PM)
                                       </button>
                                       <button onClick={() => rejectInvoice(inv.id)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#ba1a1a", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
                                         onMouseEnter={e=>{e.currentTarget.style.background="#fff0f0";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
@@ -609,11 +879,24 @@ export default function OrdersPage() {
                                       </button>
                                     </>
                                   )}
-                                  {/* Raise Payment Request — only after approval */}
+                                  {/* Stage 2 — accounts approval (TDS / advance / retention) */}
+                                  {inv.status === "PM Approved" && (
+                                    <>
+                                      <button onClick={() => approveInvoice(inv.id)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#16a34a", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
+                                        onMouseEnter={e=>{e.currentTarget.style.background="#f0fdf4";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
+                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>verified</span> Approve (Accounts)
+                                      </button>
+                                      <button onClick={() => rejectInvoice(inv.id)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#ba1a1a", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px" }}
+                                        onMouseEnter={e=>{e.currentTarget.style.background="#fff0f0";}} onMouseLeave={e=>{e.currentTarget.style.background="none";}}>
+                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>block</span> Reject Invoice
+                                      </button>
+                                    </>
+                                  )}
+                                  {/* Raise Payment Request — only after approval, until fully requested */}
                                   {inv.status === "Approved" && (
-                                    alreadyRaised ? (
+                                    fullyRequested ? (
                                       <div style={{ padding:"10px 16px", fontSize:"13px", color:"#16a34a", display:"flex", alignItems:"center", gap:"8px", opacity:0.7 }}>
-                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>check_circle</span> Request Already Raised
+                                        <span className="material-symbols-outlined" style={{ fontSize:"15px" }}>check_circle</span> Fully Requested
                                       </div>
                                     ) : (
                                       <button onClick={() => raiseFromInvoice(inv)} style={{ width:"100%", textAlign:"left", padding:"10px 16px", fontSize:"13px", color:"#e30613", background:"none", border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:"8px", fontWeight:"bold" }}
@@ -646,7 +929,44 @@ export default function OrdersPage() {
       {/* ── Tab 1: Vendor Payment Requests ───────────────────────── */}
       {activeTab === 1 && (() => {
         const { slice, total } = paginate(filtRequests, 1);
+        // Vendors with an approved advance — show consumption progress.
+        const advanceVendors = (selectedProject ? getProjectVendorPOs(selectedProject.id) : [])
+          .filter(po => po.advanceApproved && (po.advanceRequested ?? 0) > 0)
+          .map(po => {
+            const requested = po.advanceRequested ?? 0;
+            const payable   = po.advancePayable ?? requested;
+            const consumed  = po.advanceConsumed ?? 0;
+            const remaining = Math.max(0, requested - consumed);
+            const pct       = requested > 0 ? Math.min(100, (consumed / requested) * 100) : 0;
+            return { id: po.id, vendorName: po.vendorName, requested, payable, consumed, remaining, pct, tdsPct: po.advanceTdsPct ?? 0 };
+          });
         return (
+          <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+          {advanceVendors.length > 0 && (
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:"12px" }}>
+              {advanceVendors.map(av => (
+                <div key={av.id} style={{ background:"white", border:"1px solid rgba(202,138,4,0.3)", borderRadius:"10px", padding:"14px 16px", display:"flex", flexDirection:"column", gap:"8px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:"18px", color:"#a16207" }}>savings</span>
+                    <span style={{ fontSize:"13px", fontWeight:"bold", color:"#333333", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{av.vendorName}</span>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.05em", color:"#a16207", background:"rgba(202,138,4,0.1)", border:"1px solid rgba(202,138,4,0.25)", borderRadius:"999px", padding:"2px 8px", whiteSpace:"nowrap" }}>Advance Tracking</span>
+                  </div>
+                  <div style={{ fontSize:"11px", color:"#666666" }}>
+                    Requested: ₹{av.requested.toLocaleString("en-IN")} · Payable: ₹{av.payable.toLocaleString("en-IN")} (TDS {av.tdsPct}%)
+                  </div>
+                  <div style={{ height:"6px", width:"100%", background:"#e4e2e1", borderRadius:"3px", overflow:"hidden" }}>
+                    <div style={{ height:"100%", width:`${av.pct}%`, background: av.remaining <= 0 ? "#16a34a" : "#a16207", transition:"width 0.3s" }} />
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#666666" }}>
+                    <span>Consumed: ₹{av.consumed.toLocaleString("en-IN")}</span>
+                    <span style={{ fontWeight:"bold", color: av.remaining <= 0 ? "#16a34a" : "#a16207" }}>
+                      {av.remaining <= 0 ? "Fully consumed" : `₹${av.remaining.toLocaleString("en-IN")} remaining`}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ border:"1px solid #e4e2e1", borderRadius:"12px", overflow:"visible", boxShadow:"0 1px 3px rgba(0,0,0,0.05)" }}>
             <div style={{ padding:"14px 20px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", alignItems:"center", gap:"8px" }}>
               <div style={{ width:"3px", height:"20px", background:"#e30613", borderRadius:"2px" }} />
@@ -670,7 +990,10 @@ export default function OrdersPage() {
                         onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background="white"; }}>
                         <td style={{ padding:"14px 20px" }}>
                           <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
-                            <span style={{ fontSize:"13px", fontWeight:"bold", color:"#e30613" }}>{r.id}</span>
+                            <div style={{ display:"flex", alignItems:"center", gap:"6px", flexWrap:"wrap" }}>
+                              <span style={{ fontSize:"13px", fontWeight:"bold", color:"#e30613" }}>{r.id}</span>
+                              {r.priority && badge(r.priority, PRIORITY_STYLE[r.priority])}
+                            </div>
                             {r.invoiceRef && (
                               <button
                                 onClick={() => { setActiveTab(0); setSlideInvId(r.invoiceRef ?? null); }}
@@ -681,18 +1004,29 @@ export default function OrdersPage() {
                             )}
                           </div>
                         </td>
-                        <td style={{ padding:"14px 20px", fontSize:"13px", color:"#333333" }}>{r.vendor}</td>
+                        <td style={{ padding:"14px 20px" }}>
+                          <div style={{ display:"flex", flexDirection:"column", gap:"2px" }}>
+                            <span style={{ fontSize:"13px", color:"#333333" }}>{r.vendor}</span>
+                            {r.notes && <span style={{ fontSize:"10px", color:"#999999", fontStyle:"italic", maxWidth:"220px", lineHeight:1.4 }}>{r.notes}</span>}
+                          </div>
+                        </td>
                         <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{r.project}</td>
                         <td style={{ padding:"14px 20px", fontSize:"13px", fontWeight:"600", color:"#333333", textAlign:"right" }}>{r.amount}</td>
                         <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{r.requested}</td>
-                        <td style={{ padding:"14px 20px" }}>{badge(r.status, REQ_STYLE[r.status])}</td>
+                        <td style={{ padding:"14px 20px" }}>
+                          <div style={{ display:"flex", flexDirection:"column", gap:"4px", alignItems:"flex-start" }}>
+                            {badge(r.status, REQ_STYLE[r.status])}
+                            {r.accountsApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>Accounts: {r.accountsApprovedBy}</span>}
+                            {r.paidBy && <span style={{ fontSize:"10px", color:"#666666" }}>Paid: {r.paidBy}</span>}
+                          </div>
+                        </td>
                         <td style={{ padding:"14px 20px" }}>
                           <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
                             {r.status === "Pending Accounts Approval" && (
-                              <button onClick={() => approveReqByAccounts(r.id)} style={{ padding:"4px 12px", border:"1px solid rgba(34,197,94,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#16a34a", background:"rgba(34,197,94,0.05)", cursor:"pointer" }}>Approve (Accounts)</button>
+                              <button onClick={() => askApprover({ title:`Approve payment ${r.id}`, label:"Accounts Approver Name", cta:"Approve", defaultName:"Arjun K.", run:(name)=>approveReqByAccounts(r.id, name) })} style={{ padding:"4px 12px", border:"1px solid rgba(34,197,94,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#16a34a", background:"rgba(34,197,94,0.05)", cursor:"pointer" }}>Approve (Accounts)</button>
                             )}
                             {r.status === "Approved by Accounts" && (
-                              <button onClick={() => markReqPaid(r.id)} style={{ padding:"4px 12px", border:"1px solid rgba(0,89,168,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#0059a8", background:"rgba(0,89,168,0.05)", cursor:"pointer" }}>Mark Paid</button>
+                              <button onClick={() => askApprover({ title:`Mark ${r.id} paid`, label:"Paid By Name", cta:"Mark Paid", defaultName: r.accountsApprovedBy ?? "Arjun K.", run:(name)=>markReqPaid(r.id, name) })} style={{ padding:"4px 12px", border:"1px solid rgba(0,89,168,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#0059a8", background:"rgba(0,89,168,0.05)", cursor:"pointer" }}>Mark Paid</button>
                             )}
                             {r.invoiceFile ? (
                               <button onClick={() => setViewReqInvoice(r)}
@@ -712,6 +1046,7 @@ export default function OrdersPage() {
               </>
             )}
           </div>
+          </div>
         );
       })()}
 
@@ -724,12 +1059,13 @@ export default function OrdersPage() {
         return (
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             {/* Summary row */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:"12px" }}>
               {[
-                { label:"Total Spent", value:`₹${totalAmt.toLocaleString()}`, color:"#e30613" },
-                { label:"Materials",   value:`₹${(catMap["Materials"]??0).toLocaleString()}`,   color:"#333333" },
-                { label:"Labor",       value:`₹${(catMap["Labor"]??0).toLocaleString()}`,       color:"#333333" },
-                { label:"Equipment",   value:`₹${(catMap["Equipment"]??0).toLocaleString()}`,   color:"#333333" },
+                { label:"Total Spent",    value:`₹${totalAmt.toLocaleString()}`, color:"#e30613" },
+                { label:"Materials",      value:`₹${(catMap["Materials"]??0).toLocaleString()}`,     color:"#333333" },
+                { label:"Labor",          value:`₹${(catMap["Labor"]??0).toLocaleString()}`,         color:"#333333" },
+                { label:"Equipment",      value:`₹${(catMap["Equipment"]??0).toLocaleString()}`,     color:"#333333" },
+                { label:"Miscellaneous",  value:`₹${(catMap["Miscellaneous"]??0).toLocaleString()}`, color:"#333333" },
               ].map(s => (
                 <div key={s.label} style={{ background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"16px" }}>
                   <p style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", color:"#999999", marginBottom:"4px" }}>{s.label}</p>
@@ -743,7 +1079,7 @@ export default function OrdersPage() {
                   <table style={{ width:"100%", borderCollapse:"collapse" }}>
                     <thead>
                       <tr style={{ background:"#f8f8f8", borderBottom:"1px solid #e4e2e1" }}>
-                        {["ID","Category","Description","Project","Amount","Date","By",""].map((h,i) => (
+                        {["ID","Category","Description","Project","Amount","Date","By","Status",""].map((h,i) => (
                           <th key={i} style={{ padding:"14px 20px", fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#666666", textAlign: h==="Amount"?"right":"left" }}>{h}</th>
                         ))}
                       </tr>
@@ -763,9 +1099,40 @@ export default function OrdersPage() {
                           <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{x.date}</td>
                           <td style={{ padding:"14px 20px", fontSize:"13px", color:"#666666" }}>{x.by}</td>
                           <td style={{ padding:"14px 20px" }}>
-                            <button onClick={() => deleteExpense(x.id)} style={{ padding:"4px 8px", border:"1px solid #fdd", borderRadius:"6px", background:"#fff5f5", cursor:"pointer", display:"flex" }}>
-                              <span className="material-symbols-outlined" style={{ fontSize:"14px", color:"#ba1a1a" }}>delete</span>
-                            </button>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px", alignItems:"flex-start" }}>
+                              {badge(x.status, EXP_STYLE[x.status])}
+                              {x.pmApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>PM: {x.pmApprovedBy}</span>}
+                              {x.billingApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>Billing: {x.billingApprovedBy}</span>}
+                              {x.accountsApprovedBy && <span style={{ fontSize:"10px", color:"#666666" }}>Accounts: {x.accountsApprovedBy}</span>}
+                            </div>
+                          </td>
+                          <td style={{ padding:"14px 20px" }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap" }}>
+                              {x.status !== "Paid" && x.status !== "Rejected" && (
+                                <>
+                                  <button onClick={() => askApproveExpense(x)}
+                                    style={{ padding:"4px 10px", border:"1px solid rgba(34,197,94,0.3)", borderRadius:"6px", background:"rgba(34,197,94,0.05)", cursor:"pointer", fontSize:"11px", fontWeight:"bold", color:"#16a34a" }}>
+                                    {x.status === "Pending PM Approval" ? "Approve (PM)" : x.status === "Pending Billing Approval" ? "Approve (Billing)" : "Approve & Pay"}
+                                  </button>
+                                  <button onClick={() => rejectExpense(x.id)}
+                                    style={{ padding:"4px 8px", border:"1px solid rgba(186,26,26,0.3)", borderRadius:"6px", background:"#fff5f5", cursor:"pointer", display:"flex" }} title="Reject">
+                                    <span className="material-symbols-outlined" style={{ fontSize:"14px", color:"#ba1a1a" }}>block</span>
+                                  </button>
+                                </>
+                              )}
+                              {x.fileObj ? (
+                                <button onClick={() => setViewExpenseVoucher(x)}
+                                  style={{ padding:"4px 8px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", cursor:"pointer", display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", fontWeight:"bold", color:"#e30613" }}
+                                  title="View Voucher">
+                                  <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>receipt_long</span> View Bill
+                                </button>
+                              ) : (
+                                <span style={{ fontSize:"11px", color:"#cccccc" }}>No file</span>
+                              )}
+                              <button onClick={() => deleteExpense(x.id)} style={{ padding:"4px 8px", border:"1px solid #fdd", borderRadius:"6px", background:"#fff5f5", cursor:"pointer", display:"flex" }}>
+                                <span className="material-symbols-outlined" style={{ fontSize:"14px", color:"#ba1a1a" }}>delete</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -926,6 +1293,25 @@ export default function OrdersPage() {
                     <h4 style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#999999", marginBottom:"8px" }}>Date</h4>
                     <p style={{ fontSize:"14px", color:"#333333" }}>{slideInv.due}</p>
                   </section>
+                  {/* Overdue tracking — starts at PM approval */}
+                  {slideInv.pmApprovedAt && (() => {
+                    const od = getOverdueDays(slideInv.pmApprovedAt);
+                    return (
+                      <section>
+                        <h4 style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#999999", marginBottom:"8px" }}>Overdue Tracking</h4>
+                        <div style={{ background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"14px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                          <div>
+                            <p style={{ fontSize:"11px", color:"#666666" }}>PM Approved</p>
+                            <p style={{ fontSize:"14px", fontWeight:"bold", color:"#333333" }}>{slideInv.pmApprovedAt}</p>
+                          </div>
+                          <div style={{ textAlign:"right" }}>
+                            <p style={{ fontSize:"11px", color:"#666666" }}>Overdue</p>
+                            <p style={{ fontSize:"18px", fontWeight:"bold", color: (od ?? 0) > 0 ? "#a16207" : "#16a34a" }}>{od} {od === 1 ? "day" : "days"}</p>
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })()}
                   {/* Status */}
                   <section>
                     <h4 style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#999999", marginBottom:"8px" }}>Status</h4>
@@ -965,19 +1351,32 @@ export default function OrdersPage() {
                         style={{ flex:1, padding:"12px", border:"1px solid rgba(186,26,26,0.3)", borderRadius:"8px", background:"rgba(186,26,26,0.05)", color:"#ba1a1a", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>
                         Reject
                       </button>
+                      <button onClick={() => askPmApproveInvoice(slideInv)}
+                        style={{ flex:2, padding:"12px", border:"none", borderRadius:"8px", background:"#0059a8", color:"white", fontWeight:"bold", cursor:"pointer", fontSize:"13px", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>fact_check</span>
+                        Approve (PM)
+                      </button>
+                    </div>
+                  )}
+                  {slideInv.status === "PM Approved" && (
+                    <div style={{ display:"flex", gap:"10px" }}>
+                      <button onClick={() => rejectInvoice(slideInv.id)}
+                        style={{ flex:1, padding:"12px", border:"1px solid rgba(186,26,26,0.3)", borderRadius:"8px", background:"rgba(186,26,26,0.05)", color:"#ba1a1a", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>
+                        Reject
+                      </button>
                       <button onClick={() => approveInvoice(slideInv.id)}
                         style={{ flex:2, padding:"12px", border:"none", borderRadius:"8px", background:"#16a34a", color:"white", fontWeight:"bold", cursor:"pointer", fontSize:"13px", display:"flex", alignItems:"center", justifyContent:"center", gap:"6px" }}>
                         <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>verified</span>
-                        Approve Invoice
+                        Approve (Accounts)
                       </button>
                     </div>
                   )}
                   {slideInv.status === "Approved" && (() => {
-                    const alreadyRaised = requests.some(r => r.invoiceRef === slideInv.id);
-                    return alreadyRaised ? (
+                    const fullyRequested = invoiceRemaining(slideInv) <= 0;
+                    return fullyRequested ? (
                       <div style={{ padding:"10px 14px", background:"rgba(34,197,94,0.05)", border:"1px solid rgba(34,197,94,0.2)", borderRadius:"6px", fontSize:"13px", color:"#16a34a", display:"flex", alignItems:"center", gap:"8px" }}>
                         <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>check_circle</span>
-                        Payment request already raised
+                        Fully requested — amount payable cleared
                       </div>
                     ) : (
                       <button onClick={() => raiseFromInvoice(slideInv)}
@@ -1039,13 +1438,56 @@ export default function OrdersPage() {
         document.body
       )}
 
+      {/* ── Expense Voucher Preview ────────────────────── */}
+      {mounted && viewExpenseVoucher && createPortal(
+        <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.55)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }} onClick={() => setViewExpenseVoucher(null)}>
+          <div style={{ background:"white", border:"1px solid #e4e2e1", width:"100%", maxWidth:"720px", borderRadius:"8px", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.25)", display:"flex", flexDirection:"column", maxHeight:"90vh" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding:"14px 20px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", alignItems:"center", gap:"12px", flexShrink:0 }}>
+              <span className="material-symbols-outlined" style={{ color:"#e30613" }}>receipt_long</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <p style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Expense Voucher · {viewExpenseVoucher.id}</p>
+                <p style={{ fontSize:"14px", fontWeight:"600", color:"#333333" }}>{viewExpenseVoucher.description} — {viewExpenseVoucher.amount}</p>
+              </div>
+              <button onClick={() => setViewExpenseVoucher(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ flex:1, overflow:"auto", minHeight:"300px" }}>
+              {voucherPreviewUrl && viewExpenseVoucher.fileObj?.type === "application/pdf" && (
+                <iframe src={voucherPreviewUrl} title="Voucher" style={{ width:"100%", height:"580px", border:"none", display:"block" }} />
+              )}
+              {voucherPreviewUrl && viewExpenseVoucher.fileObj?.type.startsWith("image/") && (
+                <div style={{ background:"#1a1a1a", display:"flex", alignItems:"center", justifyContent:"center", minHeight:"300px" }}>
+                  <img src={voucherPreviewUrl} alt="Voucher" style={{ maxWidth:"100%", maxHeight:"70vh", objectFit:"contain" }} />
+                </div>
+              )}
+              {voucherPreviewUrl && !viewExpenseVoucher.fileObj?.type.startsWith("image/") && viewExpenseVoucher.fileObj?.type !== "application/pdf" && (
+                <div style={{ padding:"24px", textAlign:"center", fontSize:"14px", color:"#666666" }}>
+                  File type not previewable ({viewExpenseVoucher.fileObj?.name})
+                </div>
+              )}
+            </div>
+            {voucherPreviewUrl && (
+              <div style={{ padding:"12px 20px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"8px", flexShrink:0 }}>
+                <a href={voucherPreviewUrl} download={viewExpenseVoucher.fileObj?.name}
+                  style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", fontSize:"13px", textDecoration:"none", display:"flex", alignItems:"center", gap:"6px" }}>
+                  <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>download</span> Download
+                </a>
+                <button onClick={() => setViewExpenseVoucher(null)} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Close</button>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── New Request Modal ───────────────────────────────────── */}
       {mounted && showNew && createPortal(
         <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
           <div style={{ background:"white", border:"1px solid #e4e2e1", width:"100%", maxWidth:"520px", borderRadius:"8px", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", display:"flex", flexDirection:"column" }}>
             <div style={{ padding:"16px 24px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <h3 style={{ fontSize:"20px", fontWeight:"bold", color:"#333333" }}>New {TABS[activeTab].replace(/s$/, "").replace("Vendor ","")}</h3>
-              <button onClick={() => { setShowNew(false); setUploadError(null); }} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
+              <button onClick={closeNewModal} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -1056,8 +1498,12 @@ export default function OrdersPage() {
                 const selPO      = selectedProject && selVendor ? getVendorPO(selectedProject.id, selVendor) : undefined;
                 const invoicedSoFar = selPO ? vendorInvoiceTotal(selVendor, proj || "") : 0;
                 const remaining  = selPO ? selPO.poValue - invoicedSoFar : 0;
-                const amtNum     = parseFloat(f("amount") || "0");
-                const overCap    = !!selPO && amtNum > 0 && amtNum > remaining;
+                 const baseValueVal = parseFloat(f("baseValue") || "0");
+                 const sgstPctVal = parseFloat(f("sgstPct") || "9");
+                 const cgstPctVal = parseFloat(f("cgstPct") || "9");
+                 const igstPctVal = parseFloat(f("igstPct") || "0");
+                 const amtNum     = baseValueVal + (baseValueVal * (sgstPctVal + cgstPctVal + igstPctVal)) / 100;
+                const overCap    = !!selPO && baseValueVal > 0 && baseValueVal > remaining;
 
                 if (projectPOs.length === 0) {
                   return (
@@ -1104,20 +1550,53 @@ export default function OrdersPage() {
                       </div>
                     )}
 
-                    {/* Amount + Invoice Date */}
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px" }}>
+                    {/* Fixed contract period notice */}
+                    {selPO?.fixedContract && (
+                      <div style={{ padding:"10px 12px", background:"rgba(0,89,168,0.05)", border:"1px solid rgba(0,89,168,0.25)", borderRadius:"6px", display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:"16px", color:"#0059a8", flexShrink:0 }}>event_available</span>
+                        <span style={{ fontSize:"11px", color:"#0059a8", lineHeight:1.5 }}>
+                          {selVendor} is on a fixed contract. The invoice date must be between <strong>{selPO.contractStart ?? "—"}</strong> and <strong>{selPO.contractEnd ?? "—"}</strong>.
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Base Value + SGST + CGST + IGST + Calculated Total + Date */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
                       <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Invoice Amount (₹) <span style={{ color:"#e30613" }}>*</span></label>
-                        <input type="number" min="0" value={f("amount")} onChange={e=>{ sf("amount", e.target.value); setUploadError(null); }} placeholder="0.00"
-                          style={{ border:`1px solid ${overCap ? "#ba1a1a" : "#e4e2e1"}`, borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                        {overCap && (
-                          <span style={{ fontSize:"11px", color:"#ba1a1a" }}>Exceeds remaining PO balance by ₹{(amtNum - remaining).toLocaleString("en-IN")}</span>
-                        )}
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Base Value (₹) <span style={{ color:"#e30613" }}>*</span></label>
+                        <input type="number" min="0" value={f("baseValue")} onChange={e=>{ sf("baseValue", e.target.value); setUploadError(null); }} placeholder="0.00"
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
                         <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Invoice Date</label>
                         <input type="date" value={f("due")} onChange={e=>sf("due",e.target.value)} style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
                       </div>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>SGST (%) <span style={{ color:"#e30613" }}>*</span></label>
+                        <input type="number" min="0" value={f("sgstPct")} onChange={e=>{ sf("sgstPct", e.target.value); setUploadError(null); }} placeholder="9"
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>CGST (%) <span style={{ color:"#e30613" }}>*</span></label>
+                        <input type="number" min="0" value={f("cgstPct")} onChange={e=>{ sf("cgstPct", e.target.value); setUploadError(null); }} placeholder="9"
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>IGST (%)</label>
+                        <input type="number" min="0" value={f("igstPct")} onChange={e=>{ sf("igstPct", e.target.value); setUploadError(null); }} placeholder="0"
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:"6px", background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px" }}>
+                      <span style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>Calculated Invoice Total</span>
+                      <span style={{ fontSize:"18px", fontWeight:"bold", color: overCap ? "#ba1a1a" : "#333333" }}>
+                        ₹{amtNum.toLocaleString("en-IN")}
+                      </span>
+                      {overCap && (
+                        <span style={{ fontSize:"11px", color:"#ba1a1a" }}>Base value exceeds remaining PO balance by ₹{(baseValueVal - remaining).toLocaleString("en-IN")}</span>
+                      )}
                     </div>
 
                     {/* Invoice upload — required */}
@@ -1217,13 +1696,39 @@ export default function OrdersPage() {
                       </select>
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                      <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Amount (₹)</label>
+                      <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Amount (₹) <span style={{ color:"#e30613" }}>*</span></label>
                       <input type="number" value={f("amount")} onChange={e=>sf("amount",e.target.value)} placeholder="0.00" style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
                     </div>
                   </div>
                   <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Description</label>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Description <span style={{ color:"#e30613" }}>*</span></label>
                     <input value={f("description")} onChange={e=>sf("description",e.target.value)} placeholder="e.g. Cement bags – 50 units" style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Bill or Cash Voucher <span style={{ color:"#e30613" }}>*</span></label>
+                    <input ref={expenseFileRef} type="file" accept=".pdf,.jpg,.png,.jpeg" style={{ display:"none" }}
+                      onChange={e => setExpenseFile(e.target.files?.[0] ?? null)} />
+                    {expenseFile ? (
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 12px", background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"6px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:"16px", color:"#e30613" }}>description</span>
+                          <span style={{ fontSize:"13px", color:"#333333" }}>{expenseFile.name}</span>
+                        </div>
+                        <button onClick={() => setExpenseFile(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#999999", display:"flex" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>close</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => expenseFileRef.current?.click()}
+                        style={{ padding:"14px", border:"2px dashed #e4e2e1", borderRadius:"6px", background:"#f8f8f8", color:"#666666", fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:"20px" }}>upload_file</span>
+                        Upload Bill or Cash Voucher (PDF, JPG, PNG) — required
+                      </button>
+                    )}
+                    <p style={{ fontSize:"11px", color:"#0059a8", display:"flex", alignItems:"center", gap:"6px", lineHeight:1.5 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:"14px", flexShrink:0 }}>qr_code_2</span>
+                      In case of bill with Gpay, Add qr code in same pdf file and upload
+                    </p>
                   </div>
                 </>
               )}
@@ -1247,12 +1752,16 @@ export default function OrdersPage() {
               )}
             </div>
             <div style={{ padding:"16px 24px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"10px" }}>
-              <button onClick={() => { setShowNew(false); setUploadError(null); }} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
+              <button onClick={closeNewModal} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
               {(() => {
                 const hasPOForProject = selectedProject ? getProjectVendorPOs(selectedProject.id).length > 0 : false;
-                const disabled = activeTab === 0 && (
-                  !hasPOForProject || !newInvFile || !f("vendor") || !(parseFloat(f("amount") || "0") > 0)
-                );
+                const disabled = 
+                  (activeTab === 0 && (
+                    !hasPOForProject || !newInvFile || !f("vendor") || !(parseFloat(f("baseValue") || "0") > 0)
+                  )) ||
+                  (activeTab === 2 && (
+                    !expenseFile || !(parseFloat(f("amount") || "0") > 0) || !f("description")
+                  ));
                 return (
                   <button onClick={submitNew} disabled={disabled}
                     style={{ padding:"8px 24px", border:"none", borderRadius:"6px", background: disabled ? "#f0bcc0" : "#e30613", color:"white", fontWeight:"bold", cursor: disabled ? "not-allowed" : "pointer", fontSize:"13px" }}>
@@ -1260,6 +1769,312 @@ export default function OrdersPage() {
                   </button>
                 );
               })()}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Approve Invoice Modal ───────────────────────────────── */}
+      {mounted && approvingInvId && (() => {
+        const inv = invoices.find(x => x.id === approvingInvId);
+        if (!inv) return null;
+        // File objects don't survive localStorage (they rehydrate as {}), so only
+        // create a preview URL when we actually have a Blob/File in memory.
+        const previewUrl = inv.fileObj instanceof Blob ? URL.createObjectURL(inv.fileObj) : null;
+
+        return createPortal(
+          <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }}>
+            <div style={{ background:"white", border:"1px solid #e4e2e1", width:"100%", maxWidth:"720px", borderRadius:"8px", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", display:"flex", flexDirection:"column", maxHeight:"90vh" }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding:"16px 24px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+                <h3 style={{ fontSize:"20px", fontWeight:"bold", color:"#333333" }}>Approve Vendor Invoice</h3>
+                <button onClick={() => setApprovingInvId(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div style={{ padding:"24px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"16px", flex:1 }}>
+                
+                {/* Invoice Information Display */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", background:"#f8f8f8", borderRadius:"6px", padding:"12px", border:"1px solid #e4e2e1" }}>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Invoice ID</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>{inv.id}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Vendor</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>{inv.vendor}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Project</span>
+                    <p style={{ fontSize:"13px", color:"#666666" }}>{inv.project}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Total Invoice Amount</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#e30613" }}>
+                      ₹{((inv.baseValue ?? inv.amountNum) * (1 + (approveSgstPct + approveCgstPct + approveIgstPct) / 100)).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Optional Document Preview */}
+                {previewUrl && inv.fileObj instanceof Blob && (
+                  <div style={{ border:"1px solid #e4e2e1", borderRadius:"6px", overflow:"hidden" }}>
+                    <span style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", color:"#999999", padding:"6px 12px", display:"block", background:"#f8f8f8", borderBottom:"1px solid #e4e2e1" }}>Attached Document</span>
+                    {inv.fileObj.type === "application/pdf" && previewUrl ? (
+                      <iframe src={previewUrl} title="Invoice preview" style={{ width:"100%", height:"180px", border:"none" }} />
+                    ) : previewUrl ? (
+                      <img src={previewUrl} alt="Invoice preview" style={{ width:"100%", maxHeight:"180px", objectFit:"contain", background:"#f0f0f0" }} />
+                    ) : null}
+                  </div>
+                )}
+
+                {/* Approval Inputs Form */}
+                <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Accounts Approver Name</label>
+                    <input value={approveBy} onChange={e => setApproveBy(e.target.value)} placeholder="e.g. Arjun K."
+                      style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Approval Remarks / Notes</label>
+                    <textarea 
+                      value={approveRemarks} 
+                      onChange={e => setApproveRemarks(e.target.value)} 
+                      rows={2} 
+                      placeholder="Add remarks or instructions for finance/accounts team..." 
+                      style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none", resize:"none", fontFamily:"inherit" }} 
+                    />
+                  </div>
+
+                  <div style={{ borderTop:"1px solid #e4e2e1", paddingTop:"12px", marginTop:"4px", display:"flex", flexDirection:"column", gap:"14px" }}>
+                    <span style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Tax (GST)</span>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#666666" }}>
+                      <span>Base Value</span>
+                      <span style={{ fontWeight:600, color:"#333333" }}>₹{(inv.baseValue ?? inv.amountNum).toLocaleString("en-IN")}</span>
+                    </div>
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>SGST %</label>
+                        <input type="number" min="0" value={approveSgstPct} onChange={e => setApproveSgstPct(Number(e.target.value) || 0)}
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>CGST %</label>
+                        <input type="number" min="0" value={approveCgstPct} onChange={e => setApproveCgstPct(Number(e.target.value) || 0)}
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>IGST %</label>
+                        <input type="number" min="0" value={approveIgstPct} onChange={e => setApproveIgstPct(Number(e.target.value) || 0)}
+                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      </div>
+                    </div>
+                    <span style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Financial Breakdown</span>
+                    {(() => {
+                      const advRemaining = vendorAdvanceRemaining(inv.vendor);
+                      const base         = inv.baseValue ?? inv.amountNum;
+                      const sgstAmount   = base * approveSgstPct / 100;
+                      const cgstAmount   = base * approveCgstPct / 100;
+                      const igstAmount   = base * approveIgstPct / 100;
+                      const total        = base + sgstAmount + cgstAmount + igstAmount;
+                      const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, advRemaining) : 0;
+                      const afterAdvance = Math.max(0, total - deduct);
+                      const tdsAmount    = afterAdvance * approveTdsPct / 100;
+                      const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+                      const rowStyle: React.CSSProperties = { display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#666666" };
+                      return (
+                        <>
+                          {/* Advance deduction — only when vendor has an approved advance left */}
+                          {advRemaining > 0 && (
+                            <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                              <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
+                                <input type="checkbox" checked={deductFromAdvance} onChange={e => setDeductFromAdvance(e.target.checked)} style={{ width:"16px", height:"16px", accentColor:"#e30613" }} />
+                                <span style={{ fontSize:"13px", fontWeight:"500", color:"#333333" }}>Deduct from Advance</span>
+                                <span style={{ fontSize:"11px", color:"#a16207", marginLeft:"auto" }}>₹{advRemaining.toLocaleString("en-IN")} available</span>
+                              </label>
+                              {deductFromAdvance && (
+                                <input type="number" min="0" max={Math.min(total, advRemaining)} value={advanceDeductAmt} onChange={e => setAdvanceDeductAmt(e.target.value)}
+                                  style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                              )}
+                            </div>
+                          )}
+                          {/* TDS % */}
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px" }}>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>TDS %</label>
+                              <select value={approveTdsPct} onChange={e => setApproveTdsPct(Number(e.target.value))}
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none", background:"white" }}>
+                                {[1,2,10].map(p => <option key={p} value={p}>{p}%</option>)}
+                              </select>
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>TDS Amount</label>
+                              <div style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", background:"#f8f8f8", color:"#ba1a1a", fontWeight:"bold" }}>−₹{tdsAmount.toLocaleString("en-IN")}</div>
+                            </div>
+                          </div>
+                          {/* Retention */}
+                          <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                            <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer" }}>
+                              <input type="checkbox" checked={holdRetention} onChange={e => setHoldRetention(e.target.checked)} style={{ width:"16px", height:"16px", accentColor:"#e30613" }} />
+                              <span style={{ fontSize:"13px", fontWeight:"500", color:"#333333" }}>Hold 5% Retention</span>
+                              {holdRetention && <span style={{ fontSize:"11px", color:"#a16207", marginLeft:"auto" }}>₹{retentionAmt.toLocaleString("en-IN")}</span>}
+                            </label>
+                            {holdRetention && <span style={{ fontSize:"10px", color:"#999999" }}>Retention releasable 12 months after project completion.</span>}
+                          </div>
+                          {/* Summary */}
+                          <div style={{ background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px 14px", display:"flex", flexDirection:"column", gap:"5px" }}>
+                            <div style={rowStyle}><span>Base Value</span><span style={{ color:"#333333", fontWeight:600 }}>₹{base.toLocaleString("en-IN")}</span></div>
+                            {approveSgstPct > 0 && <div style={rowStyle}><span>SGST ({approveSgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{sgstAmount.toLocaleString("en-IN")}</span></div>}
+                            {approveCgstPct > 0 && <div style={rowStyle}><span>CGST ({approveCgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{cgstAmount.toLocaleString("en-IN")}</span></div>}
+                            {approveIgstPct > 0 && <div style={rowStyle}><span>IGST ({approveIgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{igstAmount.toLocaleString("en-IN")}</span></div>}
+                            <div style={rowStyle}><span>Invoice Total</span><span style={{ color:"#333333", fontWeight:600 }}>₹{total.toLocaleString("en-IN")}</span></div>
+                            {deduct > 0 && <div style={rowStyle}><span>Advance Deducted</span><span style={{ color:"#ba1a1a", fontWeight:600 }}>−₹{deduct.toLocaleString("en-IN")}</span></div>}
+                            <div style={rowStyle}><span>After Advance</span><span style={{ color:"#333333", fontWeight:600 }}>₹{afterAdvance.toLocaleString("en-IN")}</span></div>
+                            <div style={rowStyle}><span>TDS ({approveTdsPct}%)</span><span style={{ color:"#ba1a1a", fontWeight:600 }}>−₹{tdsAmount.toLocaleString("en-IN")}</span></div>
+                            {retentionAmt > 0 && <div style={rowStyle}><span>Retention (5%)</span><span style={{ color:"#ba1a1a", fontWeight:600 }}>−₹{retentionAmt.toLocaleString("en-IN")}</span></div>}
+                            <div style={{ display:"flex", justifyContent:"space-between", fontSize:"14px", fontWeight:"bold", borderTop:"1px solid #e4e2e1", paddingTop:"6px", marginTop:"2px" }}>
+                              <span style={{ color:"#333333" }}>Amount Payable</span>
+                              <span style={{ color:"#16a34a" }}>₹{parseFloat(amountPayable || "0").toLocaleString("en-IN")}</span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+              </div>
+              <div style={{ padding:"16px 24px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"10px", flexShrink:0 }}>
+                <button onClick={() => setApprovingInvId(null)} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
+                <button onClick={submitApproveInvoice}
+                  style={{ padding:"8px 24px", border:"none", borderRadius:"6px", background:"#16a34a", color:"white", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>
+                  Confirm Approval
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
+
+      {/* ── Raise Payment Request Modal ─────────────────────────── */}
+      {mounted && raisingReqInv && (() => {
+        const inv       = raisingReqInv;
+        const payable   = inv.amountPayable ?? inv.amountNum;
+        const requested = inv.requestedAmount ?? 0;
+        const remaining = invoiceRemaining(inv);
+        const val       = parseFloat(reqValInput || "0");
+        const invalid   = !(val > 0) || val > remaining;
+
+        return createPortal(
+          <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }} onClick={() => setRaisingReqInv(null)}>
+            <div style={{ background:"white", border:"1px solid #e4e2e1", width:"100%", maxWidth:"520px", borderRadius:"8px", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", display:"flex", flexDirection:"column", maxHeight:"90vh" }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding:"16px 24px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
+                <h3 style={{ fontSize:"20px", fontWeight:"bold", color:"#333333" }}>Raise Payment Request</h3>
+                <button onClick={() => setRaisingReqInv(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div style={{ padding:"24px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"16px", flex:1 }}>
+                {/* Invoice payable summary */}
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", background:"#f8f8f8", borderRadius:"6px", padding:"12px", border:"1px solid #e4e2e1" }}>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Invoice</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>{inv.id}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Vendor</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>{inv.vendor}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Amount Payable</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>₹{payable.toLocaleString("en-IN")}</p>
+                  </div>
+                  <div>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Already Requested</span>
+                    <p style={{ fontSize:"13px", fontWeight:"bold", color:"#333333" }}>₹{requested.toLocaleString("en-IN")}</p>
+                  </div>
+                  {(inv.retentionHeld && (inv.retentionAmount ?? 0) > 0) && (
+                    <div style={{ gridColumn:"1 / -1" }}>
+                      <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Retention Held (5%)</span>
+                      <p style={{ fontSize:"13px", fontWeight:"bold", color:"#a16207", display:"flex", alignItems:"center", gap:"4px" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>lock</span>
+                        ₹{(inv.retentionAmount ?? 0).toLocaleString("en-IN")} locked until 12 months after completion
+                      </p>
+                    </div>
+                  )}
+                  <div style={{ gridColumn:"1 / -1" }}>
+                    <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Maximum Remaining</span>
+                    <p style={{ fontSize:"16px", fontWeight:"bold", color:"#16a34a" }}>₹{remaining.toLocaleString("en-IN")}</p>
+                  </div>
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px" }}>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Requested Amount (₹) <span style={{ color:"#e30613" }}>*</span></label>
+                    <input type="number" min="0" max={remaining} value={reqValInput} onChange={e => setReqValInput(e.target.value)} placeholder="0.00"
+                      style={{ border:`1px solid ${val > remaining ? "#ba1a1a" : "#e4e2e1"}`, borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                    <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Priority</label>
+                    <select value={reqPriority} onChange={e => setReqPriority(e.target.value as "Low" | "Medium" | "High")}
+                      style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none", background:"white", color:"#333333" }}>
+                      {(["Low","Medium","High"] as const).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                  <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Remarks</label>
+                  <textarea value={reqRemarks} onChange={e => setReqRemarks(e.target.value)} rows={2} placeholder="Reason for this payment request…"
+                    style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none", resize:"none", fontFamily:"inherit" }} />
+                </div>
+
+                {val > remaining && (
+                  <div style={{ padding:"12px 14px", background:"rgba(186,26,26,0.06)", border:"1px solid rgba(186,26,26,0.3)", borderRadius:"6px", display:"flex", gap:"8px", alignItems:"flex-start" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:"18px", color:"#ba1a1a", flexShrink:0 }}>error</span>
+                    <span style={{ fontSize:"12px", color:"#ba1a1a", lineHeight:1.5 }}>
+                      Requested amount exceeds the remaining payable by ₹{(val - remaining).toLocaleString("en-IN")}.
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div style={{ padding:"16px 24px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"10px", flexShrink:0 }}>
+                <button onClick={() => setRaisingReqInv(null)} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
+                <button onClick={submitRaiseRequest} disabled={invalid}
+                  style={{ padding:"8px 24px", border:"none", borderRadius:"6px", background: invalid ? "#f0bcc0" : "#e30613", color:"white", fontWeight:"bold", cursor: invalid ? "not-allowed" : "pointer", fontSize:"13px" }}>
+                  Create Request
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
+
+      {/* ── Approver Confirmation Modal ──────────────────────────── */}
+      {mounted && confirmAction && createPortal(
+        <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, background:"rgba(0,0,0,0.45)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", padding:"24px" }} onClick={() => setConfirmAction(null)}>
+          <div style={{ background:"white", border:"1px solid #e4e2e1", width:"100%", maxWidth:"420px", borderRadius:"8px", overflow:"hidden", boxShadow:"0 20px 60px rgba(0,0,0,0.2)", display:"flex", flexDirection:"column" }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding:"16px 24px", borderBottom:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <h3 style={{ fontSize:"18px", fontWeight:"bold", color:"#333333" }}>{confirmAction.title}</h3>
+              <button onClick={() => setConfirmAction(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#666666", display:"flex" }}>
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:"6px" }}>
+              <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>{confirmAction.label} <span style={{ color:"#e30613" }}>*</span></label>
+              <input value={confirmName} onChange={e => setConfirmName(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === "Enter" && confirmName.trim()) { confirmAction.run(confirmName.trim()); setConfirmAction(null); } }}
+                placeholder="Enter approver name"
+                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+            </div>
+            <div style={{ padding:"16px 24px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"10px" }}>
+              <button onClick={() => setConfirmAction(null)} style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", cursor:"pointer", fontSize:"13px" }}>Cancel</button>
+              <button onClick={() => { if (confirmName.trim()) { confirmAction.run(confirmName.trim()); setConfirmAction(null); } }} disabled={!confirmName.trim()}
+                style={{ padding:"8px 24px", border:"none", borderRadius:"6px", background: confirmName.trim() ? "#16a34a" : "#bbdcc4", color:"white", fontWeight:"bold", cursor: confirmName.trim() ? "pointer" : "not-allowed", fontSize:"13px" }}>
+                {confirmAction.cta}
+              </button>
             </div>
           </div>
         </div>,

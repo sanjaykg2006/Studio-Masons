@@ -35,7 +35,7 @@ export default function SnagsPage() {
             <span className="material-symbols-outlined text-[40px] text-[#e4e2e1]">report_problem</span>
           </div>
           <h3 className="text-[20px] font-bold text-[#333333] mb-2">No Project Selected</h3>
-          <p className="text-[16px] text-[#666666] w-full max-w-md">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its snags.</p>
+          <p className="text-[16px] text-[#666666] w-full max-w-[28rem]">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its snags.</p>
         </div>
       </div>
     );
@@ -72,7 +72,7 @@ export default function SnagsPage() {
             <span className="material-symbols-outlined text-[40px] text-[#e4e2e1]">check_circle</span>
           </div>
           <h3 className="text-[20px] font-bold text-[#333333] mb-2">No Snags Found</h3>
-          <p className="text-[16px] text-[#666666] w-full max-w-md">No snags have been raised for <span className="font-bold text-[#e30613]">{selectedProject.name}</span> yet.</p>
+          <p className="text-[16px] text-[#666666] w-full max-w-[28rem]">No snags have been raised for <span className="font-bold text-[#e30613]">{selectedProject.name}</span> yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">

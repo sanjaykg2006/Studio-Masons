@@ -1,7 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { inviteUser } from "./actions";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
+
+// Maps the UI role labels to the Prisma Role enum values.
+const roleEnum: Record<string, string> = {
+  "Admin": "ADMIN",
+  "Project Manager": "PROJECT_MANAGER",
+  "Designer": "DESIGNER",
+  "Site Engineer": "SITE_ENGINEER",
+  "Finance": "FINANCE",
+  "Client": "CLIENT",
+};
 
 const teamMembers = [
   { name: "Vikram R.", email: "vikram@studiomasons.in", role: "Site Engineer", status: "Active", avatar: "VR" },
@@ -28,6 +39,23 @@ export default function SettingsPage() {
   const [erpConnected, setErpConnected] = useState(false);
   const [erpUrl, setErpUrl] = useState("");
   const [erpKey, setErpKey] = useState("");
+
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [inviting, startInvite] = useTransition();
+
+  function handleInvite(formData: FormData) {
+    setInviteMsg(null);
+    startInvite(async () => {
+      const res = await inviteUser(formData);
+      if (res.ok) {
+        setInviteMsg({ ok: true, text: "Invitation sent." });
+        setShowInvite(false);
+      } else {
+        setInviteMsg({ ok: false, text: res.error });
+      }
+    });
+  }
 
   const toggleNotif = (i: number, type: "email" | "inApp") => {
     setNotifs(prev => prev.map((n, idx) => idx !== i ? n : { ...n, [type === "email" ? "email" : "inApp"]: !n[type === "email" ? "email" : "inApp"] }));
@@ -111,10 +139,15 @@ export default function SettingsPage() {
         <div>
           <div className="flex justify-between items-center mb-6">
             <p className="text-[#666666]">{teamMembers.length} members in your workspace</p>
-            <button className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
+            <button onClick={() => { setInviteMsg(null); setShowInvite(true); }} className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
               <span className="material-symbols-outlined" style={{fontSize:"18px"}}>person_add</span> INVITE MEMBER
             </button>
           </div>
+          {inviteMsg && (
+            <div className={`mb-6 text-[13px] rounded p-3 border ${inviteMsg.ok ? "bg-green-500/10 border-green-500/20 text-green-700" : "bg-[#e30613]/10 border-[#e30613]/20 text-[#ba1a1a]"}`}>
+              {inviteMsg.text}
+            </div>
+          )}
           <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
             <table className="w-full text-left">
               <thead>
@@ -291,6 +324,45 @@ export default function SettingsPage() {
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
               <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE APPEARANCE</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Member Modal */}
+      {showInvite && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[28rem] rounded-lg shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] flex justify-between items-center bg-[#f8f8f8]">
+              <h3 className="text-[22px] font-bold text-[#333333]">Invite Member</h3>
+              <button onClick={() => setShowInvite(false)} className="text-[#666666] hover:text-[#e30613] transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form action={handleInvite} className="p-6 space-y-4">
+              {inviteMsg && !inviteMsg.ok && (
+                <div className="bg-[#e30613]/10 border border-[#e30613]/20 text-[#ba1a1a] text-[13px] rounded p-3">{inviteMsg.text}</div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Full Name</label>
+                <input name="name" required className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" placeholder="Jane Doe" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Company Email</label>
+                <input name="email" type="email" required className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" placeholder="jane@studiomasons.in" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Role</label>
+                <select name="role" required defaultValue="SITE_ENGINEER" className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]">
+                  {roles.map(r => <option key={r} value={roleEnum[r]}>{r}</option>)}
+                </select>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowInvite(false)} className="px-5 py-2 rounded border border-[#e4e2e1] text-[#333333] hover:bg-[#eae8e7] font-bold text-[13px] transition-all">CANCEL</button>
+                <button type="submit" disabled={inviting} className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[13px] hover:opacity-90 shadow-sm transition-all disabled:opacity-50">
+                  {inviting ? "SENDING…" : "SEND INVITE"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

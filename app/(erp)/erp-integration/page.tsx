@@ -615,7 +615,7 @@ export default function ERPIntegrationPage() {
       {/* ── Config Modal ─────────────────────────────────────────────────────── */}
       {configOpen && configTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-          <div className="bg-white border border-[#e4e2e1] w-full max-w-lg rounded-xl shadow-2xl overflow-hidden">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[32rem] rounded-xl shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: configTarget.iconBg }}>
@@ -661,7 +661,7 @@ export default function ERPIntegrationPage() {
       {/* ── New Webhook Modal ─────────────────────────────────────────────────── */}
       {newWebhookOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-          <div className="bg-white border border-[#e4e2e1] w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[28rem] rounded-xl shadow-2xl overflow-hidden">
             <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
               <h3 className="text-[18px] font-bold text-[#333333]">New Webhook</h3>
               <button onClick={() => setNewWebhookOpen(false)} className="text-[#666666] hover:text-[#e30613] transition-colors">

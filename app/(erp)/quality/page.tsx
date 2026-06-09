@@ -1,41 +1,115 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useProject } from "../../../contexts/ProjectContext";
 
-const checks = [
-  { id: "QC-041", project: "Indiranagar Residence", area: "Master Bedroom", category: "Finishing", inspector: "Vikram R.", date: "Nov 14, 2024", result: "Pass", resultStyle: "bg-green-500/10 text-green-600 border-green-500/20", score: 94 },
-  { id: "QC-040", project: "Whitefield Office", area: "Reception Lobby", category: "Civil Works", inspector: "Sneha P.", date: "Nov 13, 2024", result: "Fail", resultStyle: "bg-[#ba1a1a]/10 text-[#ba1a1a] border-[#ba1a1a]/20", score: 61 },
-  { id: "QC-039", project: "Koramangala Villa", area: "Kitchen", category: "MEP", inspector: "Amit S.", date: "Nov 12, 2024", result: "Pass", resultStyle: "bg-green-500/10 text-green-600 border-green-500/20", score: 88 },
-  { id: "QC-038", project: "HSR Layout G+3", area: "Staircase", category: "Civil Works", inspector: "Rahul K.", date: "Nov 11, 2024", result: "Conditional", resultStyle: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20", score: 74 },
-  { id: "QC-037", project: "Indiranagar Residence", area: "Bathrooms", category: "Plumbing", inspector: "Vikram R.", date: "Nov 10, 2024", result: "Pass", resultStyle: "bg-green-500/10 text-green-600 border-green-500/20", score: 91 },
+type Result = "Pass" | "Fail" | "Conditional" | "Draft";
+
+interface Inspection {
+  id: string;
+  project: string;
+  area: string;
+  category: string;
+  inspector: string;
+  date: string;
+  result: Result;
+  score: number;
+  remarks?: string;
+}
+
+const RESULT_STYLE: Record<Result, string> = {
+  Pass:        "bg-green-500/10 text-green-600 border-green-500/20",
+  Fail:        "bg-[#ba1a1a]/10 text-[#ba1a1a] border-[#ba1a1a]/20",
+  Conditional: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
+  Draft:       "bg-gray-400/10 text-gray-600 border-gray-400/30",
+};
+
+const INSPECTIONS_KEY = "erp-inspections";
+
+const initInspections: Inspection[] = [
+  { id: "QC-041", project: "Indiranagar Residence", area: "Master Bedroom", category: "Finishing",   inspector: "Vikram R.", date: "Nov 14, 2024", result: "Pass",        score: 94, remarks: "" },
+  { id: "QC-040", project: "Whitefield Office",     area: "Reception Lobby", category: "Civil Works", inspector: "Sneha P.",  date: "Nov 13, 2024", result: "Fail",        score: 61, remarks: "Honeycombing observed on lobby column — rework required." },
+  { id: "QC-039", project: "Koramangala Villa",     area: "Kitchen",        category: "MEP",          inspector: "Amit S.",   date: "Nov 12, 2024", result: "Pass",        score: 88, remarks: "" },
+  { id: "QC-038", project: "HSR Layout G+3",        area: "Staircase",      category: "Civil Works",  inspector: "Rahul K.",  date: "Nov 11, 2024", result: "Conditional", score: 74, remarks: "Minor alignment deviation — acceptable with touch-up." },
+  { id: "QC-037", project: "Indiranagar Residence", area: "Bathrooms",      category: "Plumbing",     inspector: "Vikram R.", date: "Nov 10, 2024", result: "Pass",        score: 91, remarks: "" },
 ];
 
+// Checklist segregated into Precheck, Postcheck and a line-item-wise checklist.
 const checklistCategories = [
-  { name: "Surface Finishing", items: [
-    { label: "Paint uniformity & coverage", linked: false },
-    { label: "Plaster smoothness (no cracks)", linked: false },
-    { label: "Tile alignment & grouting", linked: true },
-    { label: "Skirting installation", linked: false },
+  { name: "Precheck", items: [
+    { label: "Site safety clearance", linked: false },
+    { label: "Material check", linked: false },
+    { label: "Drawings verified", linked: false },
+    { label: "Base surface preparation", linked: true },
   ]},
-  { name: "Structural Integrity", items: [
-    { label: "Column plumb & level", linked: false },
-    { label: "Beam alignment verified", linked: false },
-    { label: "Slab thickness compliance", linked: false },
-    { label: "Waterproofing membrane", linked: true },
+  { name: "Postcheck", items: [
+    { label: "Cleanliness & debris removal", linked: false },
+    { label: "Curing duration verified", linked: false },
+    { label: "Protection of finished surfaces", linked: false },
+    { label: "Defects logged", linked: true },
   ]},
-  { name: "MEP Systems", items: [
-    { label: "Electrical load test", linked: false },
-    { label: "Plumbing pressure test", linked: false },
-    { label: "HVAC airflow measurement", linked: false },
-    { label: "Fire safety compliance", linked: true },
+  { name: "Line Item Wise Checklist", items: [
+    { label: "Level and alignment tolerance", linked: false },
+    { label: "Gaps & joint filling", linked: false },
+    { label: "Operation of fixtures", linked: false },
+    { label: "Leakage/pressure testing", linked: true },
   ]},
 ];
+
+const freshChecklist = () => checklistCategories.map(c => ({ ...c, items: c.items.map(i => ({ ...i, checked: false })) }));
+
+function nextId(list: Inspection[]) {
+  const max = list.reduce((m, c) => {
+    const n = parseInt(c.id.replace(/\D/g, ""), 10);
+    return isNaN(n) ? m : Math.max(m, n);
+  }, 0);
+  return `QC-${String(max + 1).padStart(3, "0")}`;
+}
+
+function resultFromScore(score: number): Result {
+  return score >= 80 ? "Pass" : score >= 70 ? "Conditional" : "Fail";
+}
 
 export default function QualityPage() {
-  const [checks2, setChecks2] = useState(checklistCategories.map(c => ({
-    ...c, items: c.items.map(i => ({ ...i, checked: false }))
-  })));
+  const { projects } = useProject();
+
+  const [inspections, setInspections] = useState<Inspection[]>(initInspections);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Live checklist (right panel) + the inspection currently being conducted.
+  const [checks2, setChecks2] = useState(freshChecklist());
+  const [active, setActive] = useState<{ project: string; area: string; category: string; inspector: string; remarks: string } | null>(null);
+
+  // New inspection modal
+  const [showNew, setShowNew] = useState(false);
+  const [newForm, setNewForm] = useState({ project: "", area: "", category: "", inspector: "", remarks: "" });
+
+  // Detail / edit modal
+  const [editing, setEditing] = useState<Inspection | null>(null);
+  const [editResult, setEditResult] = useState<Result>("Pass");
+  const [editRemarks, setEditRemarks] = useState("");
+
+  // Hydrate from localStorage.
+  useEffect(() => {
+    const stored = localStorage.getItem(INSPECTIONS_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as Inspection[];
+        if (Array.isArray(parsed)) setInspections(parsed);
+      } catch { /* ignore malformed storage */ }
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist.
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      localStorage.setItem(INSPECTIONS_KEY, JSON.stringify(inspections));
+    } catch { /* best effort */ }
+  }, [inspections, hydrated]);
 
   const toggle = (ci: number, ii: number) => {
+    if (!active) return;
     setChecks2(prev => prev.map((cat, cIdx) => cIdx !== ci ? cat : {
       ...cat, items: cat.items.map((item, iIdx) => iIdx !== ii ? item : { ...item, checked: !item.checked })
     }));
@@ -43,6 +117,55 @@ export default function QualityPage() {
 
   const totalChecked = checks2.flatMap(c => c.items).filter(i => i.checked).length;
   const totalItems = checks2.flatMap(c => c.items).length;
+
+  // Stats derived from the live inspection list.
+  const stats = [
+    { label: "Total Checks", value: String(inspections.length),                                  icon: "fact_check", color: "#e30613" },
+    { label: "Passed",       value: String(inspections.filter(i => i.result === "Pass").length),        icon: "task_alt",   color: "#16a34a" },
+    { label: "Failed",       value: String(inspections.filter(i => i.result === "Fail").length),        icon: "cancel",     color: "#ba1a1a" },
+    { label: "Conditional",  value: String(inspections.filter(i => i.result === "Conditional").length), icon: "warning",    color: "#ca8a04" },
+  ];
+
+  function startInspection() {
+    setActive({ ...newForm, project: newForm.project || projects[0]?.name || "" });
+    setChecks2(freshChecklist());
+    setShowNew(false);
+  }
+
+  // Persist the active inspection with a given result; score = % of items checked.
+  function finishInspection(result: Result) {
+    if (!active) return;
+    const score = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
+    const insp: Inspection = {
+      id: nextId(inspections),
+      project: active.project,
+      area: active.area || "—",
+      category: active.category || "—",
+      inspector: active.inspector || "—",
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      result,
+      score,
+      remarks: active.remarks,
+    };
+    setInspections(prev => [insp, ...prev]);
+    setActive(null);
+    setChecks2(freshChecklist());
+  }
+
+  function openEdit(insp: Inspection) {
+    setEditing(insp);
+    setEditResult(insp.result);
+    setEditRemarks(insp.remarks ?? "");
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    setInspections(prev => prev.map(x => x.id === editing.id ? { ...x, result: editResult, remarks: editRemarks } : x));
+    setEditing(null);
+  }
+
+  const labelCls = "text-[11px] font-bold uppercase text-[#e30613] tracking-wider";
+  const inputCls = "border border-[#e4e2e1] rounded px-3 py-2.5 text-[13px] outline-none focus:border-[#e30613]";
 
   return (
     <div>
@@ -57,7 +180,8 @@ export default function QualityPage() {
           <h2 className="text-[32px] font-bold text-[#333333] mb-2">Quality Checks</h2>
           <p className="text-[#666666]">Systematic inspection of workmanship, materials, and compliance across all active sites.</p>
         </div>
-        <button className="bg-[#e30613] text-white px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:opacity-90 shadow-sm transition-all">
+        <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "" }); setShowNew(true); }}
+          className="bg-[#e30613] text-white px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:opacity-90 shadow-sm transition-all">
           <span className="material-symbols-outlined" style={{fontSize:"20px"}}>add_circle</span>
           NEW INSPECTION
         </button>
@@ -65,12 +189,7 @@ export default function QualityPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-6 mb-10">
-        {[
-          { label: "Total Checks", value: "41", icon: "fact_check", color: "#e30613" },
-          { label: "Passed", value: "31", icon: "task_alt", color: "#16a34a" },
-          { label: "Failed", value: "6", icon: "cancel", color: "#ba1a1a" },
-          { label: "Conditional", value: "4", icon: "warning", color: "#ca8a04" },
-        ].map((s, i) => (
+        {stats.map((s, i) => (
           <div key={i} style={{background:"#f8f8f8",border:"1px solid #e4e2e1",padding:"24px",boxShadow:"0 1px 3px rgba(0,0,0,0.05)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px"}}>
               <span style={{fontSize:"10px",fontWeight:"bold",textTransform:"uppercase",letterSpacing:"0.1em",color:"#666666"}}>{s.label}</span>
@@ -91,14 +210,14 @@ export default function QualityPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-[#f8f8f8] border-b border-[#e4e2e1]">
-                {["ID", "Project / Area", "Inspector", "Score", "Result"].map(h => (
+                {["ID", "Project / Area", "Inspector", "Result"].map(h => (
                   <th key={h} className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-[#666666]">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e4e2e1]">
-              {checks.map((c, i) => (
-                <tr key={i} className="hover:bg-[#f8f8f8] transition-colors">
+              {inspections.map((c) => (
+                <tr key={c.id} onClick={() => openEdit(c)} className="hover:bg-[#f8f8f8] transition-colors cursor-pointer">
                   <td className="px-4 py-4 font-bold text-[#e30613] text-[13px]">{c.id}</td>
                   <td className="px-4 py-4">
                     <div className="font-medium text-[#333333] text-[14px]">{c.project}</div>
@@ -106,15 +225,7 @@ export default function QualityPage() {
                   </td>
                   <td className="px-4 py-4 text-[#333333] text-[14px]">{c.inspector}</td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-[#333333]">{c.score}%</span>
-                      <div style={{width:"60px",height:"4px",background:"#e4e2e1",borderRadius:"2px"}}>
-                        <div style={{width:`${c.score}%`,height:"100%",background:c.score>=80?"#16a34a":c.score>=70?"#ca8a04":"#ba1a1a",borderRadius:"2px"}} />
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${c.resultStyle}`}>{c.result}</span>
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${RESULT_STYLE[c.result]}`}>{c.result}</span>
                   </td>
                 </tr>
               ))}
@@ -132,35 +243,139 @@ export default function QualityPage() {
               </div>
               <span className="text-[12px] font-bold text-[#e30613]">{totalChecked}/{totalItems}</span>
             </div>
+            {active && (
+              <div className="text-[11px] text-[#666666] mt-2">
+                {active.project} · {active.area || "—"} · {active.inspector || "—"}
+              </div>
+            )}
             <div style={{height:"4px",background:"#e4e2e1",borderRadius:"2px",marginTop:"12px"}}>
               <div style={{width:`${(totalChecked/totalItems)*100}%`,height:"100%",background:"#e30613",borderRadius:"2px",transition:"width 0.3s"}} />
             </div>
           </div>
-          <div className="p-4 overflow-y-auto max-h-[500px] custom-scrollbar">
-            {checks2.map((cat, ci) => (
-              <div key={ci} className="mb-6">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#e30613] mb-3">{cat.name}</h4>
-                <div className="space-y-2">
-                  {cat.items.map((item, ii) => (
-                    <div key={ii} onClick={() => toggle(ci, ii)}
-                      className="flex items-center gap-3 p-3 border border-[#e4e2e1] rounded cursor-pointer hover:border-[#e30613]/40 hover:bg-[#f8f8f8] transition-all">
-                      <div style={{width:"18px",height:"18px",borderRadius:"4px",border:`2px solid ${item.checked?"#e30613":"#e4e2e1"}`,background:item.checked?"#e30613":"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
-                        {item.checked && <span className="material-symbols-outlined text-white" style={{fontSize:"12px"}}>check</span>}
-                      </div>
-                      <span className="text-[13px] text-[#333333] flex-1">{item.label}</span>
-                      {item.linked && <span className="text-[10px] text-[#e30613] font-bold">→ SNAG</span>}
+
+          {!active ? (
+            <div className="p-10 flex flex-col items-center justify-center text-center gap-3" style={{minHeight:"320px"}}>
+              <span className="material-symbols-outlined" style={{fontSize:"40px",color:"#e4e2e1"}}>checklist</span>
+              <p className="text-[14px] text-[#666666]">No active inspection.</p>
+              <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "" }); setShowNew(true); }}
+                className="text-[13px] font-bold text-[#e30613] hover:underline">Start a new inspection →</button>
+            </div>
+          ) : (
+            <>
+              <div className="p-4 overflow-y-auto max-h-[500px] custom-scrollbar">
+                {checks2.map((cat, ci) => (
+                  <div key={ci} className="mb-6">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#e30613] mb-3">{cat.name}</h4>
+                    <div className="space-y-2">
+                      {cat.items.map((item, ii) => (
+                        <div key={ii} onClick={() => toggle(ci, ii)}
+                          className="flex items-center gap-3 p-3 border border-[#e4e2e1] rounded cursor-pointer hover:border-[#e30613]/40 hover:bg-[#f8f8f8] transition-all">
+                          <div style={{width:"18px",height:"18px",borderRadius:"4px",border:`2px solid ${item.checked?"#e30613":"#e4e2e1"}`,background:item.checked?"#e30613":"white",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all 0.15s"}}>
+                            {item.checked && <span className="material-symbols-outlined text-white" style={{fontSize:"12px"}}>check</span>}
+                          </div>
+                          <span className="text-[13px] text-[#333333] flex-1">{item.label}</span>
+                          {item.linked && <span className="text-[10px] text-[#e30613] font-bold">→ SNAG</span>}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="px-4 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex gap-3">
-            <button className="flex-1 border border-[#e4e2e1] py-2 rounded text-[#333333] text-[13px] font-bold hover:bg-[#eae8e7] transition-all">SAVE DRAFT</button>
-            <button className="flex-[2] bg-[#e30613] text-white py-2 rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all">SUBMIT INSPECTION</button>
-          </div>
+              <div className="px-4 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex gap-3">
+                <button onClick={() => finishInspection("Draft")} className="flex-1 border border-[#e4e2e1] py-2 rounded text-[#333333] text-[13px] font-bold hover:bg-[#eae8e7] transition-all">SAVE DRAFT</button>
+                <button onClick={() => finishInspection(resultFromScore(totalItems > 0 ? Math.round((totalChecked/totalItems)*100) : 0))} className="flex-[2] bg-[#e30613] text-white py-2 rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all">SUBMIT INSPECTION</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* New Inspection Modal */}
+      {showNew && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6" style={{background:"rgba(0,0,0,0.45)"}} onClick={() => setShowNew(false)}>
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[480px] rounded-lg overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
+              <h3 className="text-[20px] font-bold text-[#333333]">New Inspection</h3>
+              <button onClick={() => setShowNew(false)} className="text-[#666666] flex"><span className="material-symbols-outlined">close</span></button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Project</label>
+                <select value={newForm.project} onChange={e => setNewForm(f => ({ ...f, project: e.target.value }))} className={inputCls + " bg-white"}>
+                  <option value="">Select a project…</option>
+                  {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className={labelCls}>Area</label>
+                  <input value={newForm.area} onChange={e => setNewForm(f => ({ ...f, area: e.target.value }))} placeholder="e.g. Master Bedroom" className={inputCls} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className={labelCls}>Category</label>
+                  <input value={newForm.category} onChange={e => setNewForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Finishing" className={inputCls} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Inspector</label>
+                <input value={newForm.inspector} onChange={e => setNewForm(f => ({ ...f, inspector: e.target.value }))} placeholder="e.g. Vikram R." className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Remarks</label>
+                <textarea value={newForm.remarks} onChange={e => setNewForm(f => ({ ...f, remarks: e.target.value }))} rows={2} placeholder="Notes for this inspection…" className={inputCls + " resize-none font-[inherit]"} />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end gap-3">
+              <button onClick={() => setShowNew(false)} className="px-5 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px]">Cancel</button>
+              <button onClick={startInspection} disabled={!newForm.project && projects.length === 0}
+                className="px-6 py-2 rounded text-white font-bold text-[13px]" style={{background:"#e30613"}}>Start Inspection</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inspection Detail / Edit Modal */}
+      {editing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6" style={{background:"rgba(0,0,0,0.45)"}} onClick={() => setEditing(null)}>
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[480px] rounded-lg overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
+              <h3 className="text-[20px] font-bold text-[#333333]">Inspection {editing.id}</h3>
+              <button onClick={() => setEditing(null)} className="text-[#666666] flex"><span className="material-symbols-outlined">close</span></button>
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4 bg-[#f8f8f8] border border-[#e4e2e1] rounded p-4">
+                {[
+                  { k: "Project", v: editing.project },
+                  { k: "Area", v: editing.area },
+                  { k: "Category", v: editing.category },
+                  { k: "Inspector", v: editing.inspector },
+                  { k: "Date", v: editing.date },
+                  { k: "Score", v: `${editing.score}%` },
+                ].map(d => (
+                  <div key={d.k}>
+                    <p className="text-[9px] font-bold uppercase text-[#999999]">{d.k}</p>
+                    <p className="text-[13px] font-medium text-[#333333]">{d.v}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Result</label>
+                <select value={editResult} onChange={e => setEditResult(e.target.value as Result)} className={inputCls + " bg-white"}>
+                  {(["Pass", "Conditional", "Fail", "Draft"] as Result[]).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Remarks</label>
+                <textarea value={editRemarks} onChange={e => setEditRemarks(e.target.value)} rows={3} placeholder="Inspection remarks…" className={inputCls + " resize-none font-[inherit]"} />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end gap-3">
+              <button onClick={() => setEditing(null)} className="px-5 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px]">Cancel</button>
+              <button onClick={saveEdit} className="px-6 py-2 rounded text-white font-bold text-[13px]" style={{background:"#16a34a"}}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

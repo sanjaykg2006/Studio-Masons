@@ -2,6 +2,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useNavigation } from "../../contexts/NavigationContext";
+
+// Lets browser shortcuts (open in new tab/window) keep working, otherwise
+// routes through the navigation transition so the loading overlay appears.
+function isModifiedClick(e: React.MouseEvent) {
+  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+}
 
 const navItems = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
@@ -18,6 +25,7 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { navigate } = useNavigation();
   return (
     <aside className="fixed left-0 top-0 h-full flex flex-col py-6 bg-[#f8f8f8] border-r border-[#e4e2e1] w-64 z-50">
       <div className="px-6 mb-10">
@@ -30,6 +38,7 @@ export default function Sidebar() {
             return (
               <li key={item.href}>
                 <Link href={item.href}
+                  onClick={(e) => { if (!isModifiedClick(e)) { e.preventDefault(); navigate(item.href); } }}
                   className={`flex items-center gap-3 py-3 pl-4 transition-all duration-200 ${
                     isActive ? "bg-white text-[#e30613] font-bold border-r-4 border-[#e30613]" : "text-[#666666] hover:bg-white hover:text-[#e30613]"
                   }`}>
@@ -42,7 +51,9 @@ export default function Sidebar() {
         </ul>
       </nav>
       <div className="mt-auto px-2">
-        <Link href="/settings" className="flex items-center gap-3 py-3 pl-4 text-[#666666] hover:bg-white hover:text-[#e30613] transition-colors">
+        <Link href="/settings"
+          onClick={(e) => { if (!isModifiedClick(e)) { e.preventDefault(); navigate("/settings"); } }}
+          className="flex items-center gap-3 py-3 pl-4 text-[#666666] hover:bg-white hover:text-[#e30613] transition-colors">
           <span className="material-symbols-outlined">settings</span>
           <span className="text-[16px]">Settings</span>
         </Link>

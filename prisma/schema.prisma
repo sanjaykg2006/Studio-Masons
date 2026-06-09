@@ -62,12 +62,13 @@ enum ERPSyncStatus {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      Role
-  avatarUrl String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  supabaseId String?  @unique
+  email      String   @unique
+  name       String
+  role       Role
+  avatarUrl  String?
+  createdAt  DateTime @default(now())
 
   assignedSnags   Snag[]        @relation("SnagAssignee")
   uploadedDesigns DesignFile[]

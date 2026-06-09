@@ -2,6 +2,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useProject } from "../../contexts/ProjectContext";
+import { createClient } from "@/lib/supabase/client";
+
+function initials(value: string) {
+  const parts = value.replace(/@.*/, "").split(/[ .]+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "");
+}
 
 const statusColor: Record<string, string> = {
   "In Progress": "bg-primary/10 text-primary border-primary/20",
@@ -36,6 +42,26 @@ export default function Topbar() {
   const [readSet,       setReadSet]       = useState<Set<number>>(
     new Set(demoNotifications.flatMap((n, i) => (n.read ? [i] : [])))
   );
+  const [userEmail,     setUserEmail]     = useState<string>("");
+  const [userName,      setUserName]      = useState<string>("");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      const u = data.user;
+      if (!u) return;
+      setUserEmail(u.email ?? "");
+      setUserName((u.user_metadata?.name as string) ?? u.email ?? "");
+    });
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    setShowAccount(false);
+    router.push("/login");
+    router.refresh();
+  }
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notifRef    = useRef<HTMLDivElement>(null);
@@ -301,16 +327,16 @@ export default function Topbar() {
         <div ref={accountRef} className="relative">
           <button
             onClick={() => { setShowAccount(!showAccount); setOpen(false); setShowNotif(false); }}
-            className="w-8 h-8 rounded-full bg-[#e4e2e1] flex items-center justify-center text-[12px] font-bold text-[#666666] hover:ring-2 hover:ring-[#e30613] transition-all"
+            className="w-8 h-8 rounded-full bg-[#e4e2e1] flex items-center justify-center text-[12px] font-bold text-[#666666] hover:ring-2 hover:ring-[#e30613] transition-all uppercase"
           >
-            SM
+            {userEmail ? initials(userName || userEmail) : "SM"}
           </button>
 
           {showAccount && (
             <div className="absolute right-0 top-full mt-2 w-[220px] bg-white border border-[#e4e2e1] rounded-lg shadow-xl z-50 overflow-hidden">
               <div className="px-4 py-3 bg-[#f8f8f8] border-b border-[#e4e2e1]">
-                <p className="text-[13px] font-bold text-[#333333]">Studio Masons</p>
-                <p className="text-[11px] text-[#666666] mt-0.5 truncate">sanjaykg1302@gmail.com</p>
+                <p className="text-[13px] font-bold text-[#333333] truncate">{userName || "Studio Masons"}</p>
+                <p className="text-[11px] text-[#666666] mt-0.5 truncate">{userEmail || "—"}</p>
               </div>
               {accountItems.map(item => (
                 <button
@@ -324,7 +350,7 @@ export default function Topbar() {
               ))}
               <button
                 className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 transition-colors"
-                onClick={() => handleAccountNav("/")}
+                onClick={handleSignOut}
               >
                 <span className="material-symbols-outlined text-[#e30613]" style={{ fontSize: "18px" }}>logout</span>
                 <span className="text-[14px] text-[#e30613] font-medium">Sign Out</span>

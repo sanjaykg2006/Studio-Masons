@@ -40,7 +40,7 @@ export default function DLPPage() {
             <span className="material-symbols-outlined text-[40px] text-[#e4e2e1]">handyman</span>
           </div>
           <h3 className="text-[20px] font-bold text-[#333333] mb-2">No Project Selected</h3>
-          <p className="text-[16px] text-[#666666] w-full max-w-md">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its DLP tickets.</p>
+          <p className="text-[16px] text-[#666666] w-full max-w-[28rem]">Use the <span className="font-bold text-[#e30613]">Project Selector</span> in the top bar to choose a project and view its DLP tickets.</p>
         </div>
       </div>
     );
@@ -152,7 +152,7 @@ export default function DLPPage() {
       {/* New Ticket Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
-          <div className="bg-white border border-[#e4e2e1] w-full max-w-lg rounded-lg shadow-2xl overflow-hidden flex flex-col">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[32rem] rounded-lg shadow-2xl overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-[#e4e2e1] flex justify-between items-center bg-[#f8f8f8]">
               <h3 className="text-[24px] font-bold text-[#333333]">Raise DLP Ticket</h3>
               <button onClick={() => setShowModal(false)} className="text-[#666666] hover:text-[#e30613] transition-colors">
