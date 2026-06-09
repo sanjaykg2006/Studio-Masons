@@ -47,11 +47,16 @@ export default function SettingsPage() {
   const [inviting, startInvite] = useTransition();
 
   const [me, setMe] = useState<Profile | null>(null);
+  const [meLoaded, setMeLoaded] = useState(false);
+  const [meError, setMeError] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
 
   useEffect(() => {
-    getMyProfile().then(setMe);
-    listTeam().then(setTeam);
+    getMyProfile()
+      .then(setMe)
+      .catch(() => setMeError(true))
+      .finally(() => setMeLoaded(true));
+    listTeam().then(setTeam).catch(() => setTeam([]));
   }, []);
 
   function handleInvite(formData: FormData) {
@@ -128,8 +133,16 @@ export default function SettingsPage() {
                     <input value={roleLabel[me.role] ?? me.role} type="text" readOnly className="bg-[#f8f8f8] border border-[#e4e2e1] rounded p-3 text-[15px] text-[#666666] focus:outline-none cursor-not-allowed" />
                   </div>
                 </>
-              ) : (
+              ) : !meLoaded ? (
                 <p className="text-[#666666] text-[14px]">Loading your profile…</p>
+              ) : meError ? (
+                <p className="text-[#ba1a1a] text-[14px]">
+                  Couldn’t load your profile — the server hit an error (often a stale or missing DATABASE_URL). Restart the dev server and check its logs.
+                </p>
+              ) : (
+                <p className="text-[#ba1a1a] text-[14px]">
+                  No profile is linked to your account. Ask an admin to invite your email, or ensure a User row exists for it.
+                </p>
               )}
             </div>
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">

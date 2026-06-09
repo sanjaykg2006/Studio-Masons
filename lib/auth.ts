@@ -15,9 +15,26 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   if (!user) return null;
 
-  const dbUser = await prisma.user.findUnique({
+  let dbUser = await prisma.user.findUnique({
     where: { supabaseId: user.id },
   });
+
+  // Self-heal: if no row is linked by supabaseId yet, link the one matching
+  // this email (e.g. a first admin created manually, or a row whose
+  // supabaseId was never set). This makes profile lookups robust.
+  if (!dbUser && user.email) {
+    const byEmail = await prisma.user.findUnique({ where: { email: user.email } });
+    if (byEmail) {
+      dbUser =
+        byEmail.supabaseId === user.id
+          ? byEmail
+          : await prisma.user.update({
+              where: { id: byEmail.id },
+              data: { supabaseId: user.id },
+            });
+    }
+  }
+
   if (!dbUser) return null;
 
   return { ...dbUser, authEmail: user.email };
