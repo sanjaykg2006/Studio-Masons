@@ -9,9 +9,16 @@ export type TeamMember = Profile & { id: string; status: "Active" | "Invited" };
 
 // The currently logged-in user's own profile (name/email/role from the DB row).
 export async function getMyProfile(): Promise<Profile | null> {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  return { name: user.name, email: user.email, role: user.role };
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    return { name: user.name, email: user.email, role: user.role };
+  } catch (err) {
+    // Surface the real cause (e.g. missing/incorrect DATABASE_URL) in the
+    // server / Vercel function logs, then let the client show its error state.
+    console.error("[getMyProfile] failed:", err);
+    throw err;
+  }
 }
 
 // All provisioned team members, with login status derived from Supabase Auth
