@@ -1,6 +1,7 @@
 "use client";
-import { useState, useTransition, useEffect } from "react";
-import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, type Profile, type TeamMember } from "./actions";
+import { useState, useTransition, useEffect, useRef } from "react";
+import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, uploadAvatar, removeAvatar, type Profile, type TeamMember } from "./actions";
+import { createClient } from "@/lib/supabase/client";
 import type { Role } from "@/app/generated/prisma";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
@@ -53,6 +54,17 @@ export default function SettingsPage() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const [showPw, setShowPw] = useState(false);
+  const [curPw, setCurPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwErr, setPwErr] = useState<string | null>(null);
+  const [pwOk, setPwOk] = useState(false);
 
   useEffect(() => {
     getMyProfile()
@@ -121,6 +133,49 @@ export default function SettingsPage() {
     setNotifs(prev => prev.map((n, idx) => idx !== i ? n : { ...n, [type === "email" ? "email" : "inApp"]: !n[type === "email" ? "email" : "inApp"] }));
   };
 
+  function onPhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("file", file);
+    setAvatarBusy(true);
+    uploadAvatar(fd).then((r) => {
+      if (r.ok) setMe((prev) => (prev ? { ...prev, avatarUrl: r.url } : prev));
+      else alert(r.error);
+    }).finally(() => setAvatarBusy(false));
+  }
+
+  function onRemovePhoto() {
+    if (!me?.avatarUrl) return;
+    setAvatarBusy(true);
+    removeAvatar().then((r) => {
+      if (r.ok) setMe((prev) => (prev ? { ...prev, avatarUrl: null } : prev));
+    }).finally(() => setAvatarBusy(false));
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwErr(null);
+    setPwOk(false);
+    if (!me) return;
+    if (newPw.length < 8) { setPwErr("New password must be at least 8 characters."); return; }
+    if (newPw !== confirmPw) { setPwErr("New passwords do not match."); return; }
+
+    setPwBusy(true);
+    const supabase = createClient();
+    // Re-authenticate to confirm the current password before changing it.
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: me.email, password: curPw });
+    if (authErr) { setPwErr("Current password is incorrect."); setPwBusy(false); return; }
+
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setPwBusy(false);
+    if (error) { setPwErr(error.message); return; }
+
+    setPwOk(true);
+    setCurPw(""); setNewPw(""); setConfirmPw("");
+  }
+
   return (
     <div>
       <nav className="flex items-center gap-2 mb-4 text-[#666666] text-[10px] font-bold uppercase tracking-widest">
@@ -156,10 +211,15 @@ export default function SettingsPage() {
             </div>
             <div className="p-6 space-y-5">
               <div className="flex items-center gap-6 mb-6">
-                <div style={{width:"72px",height:"72px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",fontWeight:"bold",color:"white",flexShrink:0}}>{me ? initials(me.name || me.email) : "—"}</div>
+                <div style={{width:"72px",height:"72px",borderRadius:"50%",background:"#e30613",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"24px",fontWeight:"bold",color:"white",flexShrink:0,overflow:"hidden"}}>
+                  {me?.avatarUrl
+                    ? <img src={me.avatarUrl} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                    : (me ? initials(me.name || me.email) : "—")}
+                </div>
                 <div>
-                  <button className="px-4 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-[#f8f8f8] transition-all mr-3">Change Photo</button>
-                  <button className="px-4 py-2 text-[13px] font-bold text-[#ba1a1a] hover:underline">Remove</button>
+                  <input ref={fileRef} type="file" accept="image/*" onChange={onPhotoChange} className="hidden" />
+                  <button onClick={() => fileRef.current?.click()} disabled={avatarBusy || !me} className="px-4 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-[#f8f8f8] transition-all mr-3 disabled:opacity-50">{avatarBusy ? "Uploading…" : "Change Photo"}</button>
+                  <button onClick={onRemovePhoto} disabled={avatarBusy || !me?.avatarUrl} className="px-4 py-2 text-[13px] font-bold text-[#ba1a1a] hover:underline disabled:opacity-40 disabled:no-underline">Remove</button>
                 </div>
               </div>
               {me ? (
@@ -203,7 +263,7 @@ export default function SettingsPage() {
                 <p className="font-bold text-[#333333]">Change Password</p>
                 <p className="text-[#666666] text-[13px]">Update your account password</p>
               </div>
-              <button className="px-4 py-2 border border-[#ba1a1a]/40 rounded text-[#ba1a1a] text-[13px] font-bold hover:bg-[#ba1a1a]/10 transition-all">CHANGE</button>
+              <button onClick={() => { setPwErr(null); setPwOk(false); setCurPw(""); setNewPw(""); setConfirmPw(""); setShowPw(true); }} className="px-4 py-2 border border-[#ba1a1a]/40 rounded text-[#ba1a1a] text-[13px] font-bold hover:bg-[#ba1a1a]/10 transition-all">CHANGE</button>
             </div>
           </div>
         </div>
@@ -417,6 +477,46 @@ export default function SettingsPage() {
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
               <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE APPEARANCE</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPw && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[28rem] rounded-lg shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] flex justify-between items-center bg-[#f8f8f8]">
+              <h3 className="text-[22px] font-bold text-[#333333]">Change Password</h3>
+              <button onClick={() => setShowPw(false)} className="text-[#666666] hover:text-[#e30613] transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
+              {pwErr && (
+                <div className="bg-[#e30613]/10 border border-[#e30613]/20 text-[#ba1a1a] text-[13px] rounded p-3">{pwErr}</div>
+              )}
+              {pwOk && (
+                <div className="bg-green-500/10 border border-green-500/20 text-green-700 text-[13px] rounded p-3">Password updated successfully.</div>
+              )}
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Current Password</label>
+                <input type="password" required value={curPw} onChange={(e) => setCurPw(e.target.value)} className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">New Password</label>
+                <input type="password" required value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="At least 8 characters" className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Confirm New Password</label>
+                <input type="password" required value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowPw(false)} className="px-5 py-2 rounded border border-[#e4e2e1] text-[#333333] hover:bg-[#eae8e7] font-bold text-[13px] transition-all">CLOSE</button>
+                <button type="submit" disabled={pwBusy} className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[13px] hover:opacity-90 shadow-sm transition-all disabled:opacity-50">
+                  {pwBusy ? "SAVING…" : "UPDATE PASSWORD"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

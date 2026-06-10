@@ -4,7 +4,7 @@ import { requireRole, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/app/generated/prisma";
 
-export type Profile = { name: string; email: string; role: string };
+export type Profile = { name: string; email: string; role: string; avatarUrl: string | null };
 export type TeamMember = Profile & { id: string; status: "Active" | "Invited" };
 
 // The currently logged-in user's own profile (name/email/role from the DB row).
@@ -12,7 +12,7 @@ export async function getMyProfile(): Promise<Profile | null> {
   try {
     const user = await getCurrentUser();
     if (!user) return null;
-    return { name: user.name, email: user.email, role: user.role };
+    return { name: user.name, email: user.email, role: user.role, avatarUrl: user.avatarUrl };
   } catch (err) {
     // Surface the real cause (e.g. missing/incorrect DATABASE_URL) in the
     // server / Vercel function logs, then let the client show its error state.
@@ -48,6 +48,7 @@ export async function listTeam(): Promise<TeamMember[]> {
     name: u.name,
     email: u.email,
     role: u.role,
+    avatarUrl: u.avatarUrl,
     status: !adminOk || (u.supabaseId && confirmed.get(u.supabaseId)) ? "Active" : "Invited",
   }));
 }
@@ -178,5 +179,55 @@ export async function removeMember(userId: string): Promise<ActionResult> {
     return { ok: false, error: "Can't remove — this member still owns project records." };
   }
 
+  return { ok: true };
+}
+
+const AVATAR_BUCKET = "avatars";
+
+export type AvatarResult = { ok: true; url: string } | { ok: false; error: string };
+
+// Uploads the logged-in user's profile photo to Supabase Storage (service-role,
+// so no bucket RLS policy is required) and saves the public URL on their row.
+export async function uploadAvatar(formData: FormData): Promise<AvatarResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "No file provided." };
+  }
+  if (!file.type.startsWith("image/")) {
+    return { ok: false, error: "Please choose an image file." };
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    return { ok: false, error: "Image must be under 2 MB." };
+  }
+
+  const admin = createAdminClient();
+
+  // First upload creates the public bucket; later calls return an "already
+  // exists" error which we can safely ignore.
+  await admin.storage.createBucket(AVATAR_BUCKET, { public: true });
+
+  const ext = (file.name.split(".").pop() || "png").toLowerCase();
+  const path = `${user.id}-${Date.now()}.${ext}`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const { error: upErr } = await admin.storage
+    .from(AVATAR_BUCKET)
+    .upload(path, buffer, { contentType: file.type, upsert: true });
+  if (upErr) return { ok: false, error: upErr.message };
+
+  const { data } = admin.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: data.publicUrl } });
+
+  return { ok: true, url: data.publicUrl };
+}
+
+// Clears the logged-in user's profile photo.
+export async function removeAvatar(): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not authenticated." };
+  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: null } });
   return { ok: true };
 }
