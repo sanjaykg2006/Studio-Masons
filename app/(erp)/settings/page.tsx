@@ -1,7 +1,6 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
-import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, uploadAvatar, removeAvatar, type Profile, type TeamMember } from "./actions";
-import { createClient } from "@/lib/supabase/client";
+import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, uploadAvatar, removeAvatar, changePassword, type Profile, type TeamMember } from "./actions";
 import type { Role } from "@/app/generated/prisma";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
@@ -158,19 +157,13 @@ export default function SettingsPage() {
     e.preventDefault();
     setPwErr(null);
     setPwOk(false);
-    if (!me) return;
     if (newPw.length < 8) { setPwErr("New password must be at least 8 characters."); return; }
     if (newPw !== confirmPw) { setPwErr("New passwords do not match."); return; }
 
     setPwBusy(true);
-    const supabase = createClient();
-    // Re-authenticate to confirm the current password before changing it.
-    const { error: authErr } = await supabase.auth.signInWithPassword({ email: me.email, password: curPw });
-    if (authErr) { setPwErr("Current password is incorrect."); setPwBusy(false); return; }
-
-    const { error } = await supabase.auth.updateUser({ password: newPw });
+    const res = await changePassword(curPw, newPw);
     setPwBusy(false);
-    if (error) { setPwErr(error.message); return; }
+    if (!res.ok) { setPwErr(res.error); return; }
 
     setPwOk(true);
     setCurPw(""); setNewPw(""); setConfirmPw("");

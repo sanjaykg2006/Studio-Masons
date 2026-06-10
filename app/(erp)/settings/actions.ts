@@ -1,5 +1,6 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { requireRole, getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/app/generated/prisma";
@@ -229,5 +230,40 @@ export async function removeAvatar(): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Not authenticated." };
   await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: null } });
+  return { ok: true };
+}
+
+// Changes the logged-in user's password. Verifies the current password first
+// (via a throwaway sign-in that doesn't touch the live session), then updates
+// it with the admin client — which avoids the client-side reauthentication /
+// "secure password change" requirement that blocks supabase.auth.updateUser().
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user || !user.supabaseId) return { ok: false, error: "Not authenticated." };
+  if (newPassword.length < 8) {
+    return { ok: false, error: "New password must be at least 8 characters." };
+  }
+
+  const email = user.authEmail ?? user.email;
+
+  const verifier = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const { error: authErr } = await verifier.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  });
+  if (authErr) return { ok: false, error: "Current password is incorrect." };
+
+  const { error } = await createAdminClient().auth.admin.updateUserById(user.supabaseId, {
+    password: newPassword,
+  });
+  if (error) return { ok: false, error: error.message };
+
   return { ok: true };
 }
