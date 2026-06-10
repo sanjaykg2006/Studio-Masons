@@ -314,7 +314,7 @@ export default function SettingsPage() {
                         {menuFor === m.id && (
                           <>
                             <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} />
-                            <div className="absolute right-0 mt-1 z-20 w-52 bg-white border border-[#e4e2e1] rounded-lg shadow-lg overflow-hidden">
+                            <div className="absolute right-0 bottom-full mb-1 z-20 w-52 bg-white border border-[#e4e2e1] rounded-lg shadow-lg overflow-hidden">
                               <button onClick={() => handleCopyMemberLink(m.id)} className="w-full text-left px-4 py-2.5 text-[13px] text-[#333333] hover:bg-[#f8f8f8] flex items-center gap-2">
                                 <span className="material-symbols-outlined" style={{fontSize:"16px"}}>link</span> Copy registration link
                               </button>
