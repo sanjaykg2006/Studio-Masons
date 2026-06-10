@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition, useEffect } from "react";
-import { inviteUser, getMyProfile, listTeam, type Profile, type TeamMember } from "./actions";
+import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, type Profile, type TeamMember } from "./actions";
+import type { Role } from "@/app/generated/prisma";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
 
@@ -50,6 +51,8 @@ export default function SettingsPage() {
   const [meLoaded, setMeLoaded] = useState(false);
   const [meError, setMeError] = useState(false);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
 
   useEffect(() => {
     getMyProfile()
@@ -64,13 +67,54 @@ export default function SettingsPage() {
     startInvite(async () => {
       const res = await inviteUser(formData);
       if (res.ok) {
-        setInviteMsg({ ok: true, text: "Invitation sent." });
+        setInviteMsg({ ok: true, text: "Invitation email sent." });
         setShowInvite(false);
         listTeam().then(setTeam);
       } else {
         setInviteMsg({ ok: false, text: res.error });
       }
     });
+  }
+
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // Clipboard blocked — nothing else to do.
+    }
+  }
+
+  function handleRoleChange(id: string, label: string) {
+    const role = roleEnum[label];
+    if (!role) return;
+    setRowBusy(id);
+    updateRole(id, role as Role).then((r) => {
+      if (r.ok) setTeam((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)));
+      else setInviteMsg({ ok: false, text: r.error });
+    }).finally(() => setRowBusy(null));
+  }
+
+  function handleCopyMemberLink(id: string) {
+    setMenuFor(null);
+    setRowBusy(id);
+    createInviteLink(id).then((r) => {
+      if (r.ok) {
+        copyLink(r.link);
+        setInviteMsg({ ok: true, text: "Registration link copied to clipboard." });
+      } else {
+        setInviteMsg({ ok: false, text: r.error });
+      }
+    }).finally(() => setRowBusy(null));
+  }
+
+  function handleRemove(id: string) {
+    setMenuFor(null);
+    if (!confirm("Remove this member from the workspace? They will lose access.")) return;
+    setRowBusy(id);
+    removeMember(id).then((r) => {
+      if (r.ok) setTeam((prev) => prev.filter((m) => m.id !== id));
+      else setInviteMsg({ ok: false, text: r.error });
+    }).finally(() => setRowBusy(null));
   }
 
   const toggleNotif = (i: number, type: "email" | "inApp") => {
@@ -202,7 +246,7 @@ export default function SettingsPage() {
                     </td>
                     <td className="px-6 py-4 text-[#666666] text-[14px]">{m.email}</td>
                     <td className="px-6 py-4">
-                      <select defaultValue={roleLabel[m.role] ?? m.role} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613]">
+                      <select value={roleLabel[m.role] ?? m.role} disabled={rowBusy === m.id} onChange={(e) => handleRoleChange(m.id, e.target.value)} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613] disabled:opacity-50">
                         {roles.map(r => <option key={r}>{r}</option>)}
                       </select>
                     </td>
@@ -210,9 +254,24 @@ export default function SettingsPage() {
                       <span style={{padding:"3px 10px",borderRadius:"999px",fontSize:"10px",fontWeight:"bold",background:m.status==="Active"?"rgba(22,163,74,0.1)":"rgba(227,6,19,0.1)",color:m.status==="Active"?"#16a34a":"#e30613",border:`1px solid ${m.status==="Active"?"rgba(22,163,74,0.2)":"rgba(227,6,19,0.2)"}`}}>{m.status}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="text-[#666666] hover:text-[#ba1a1a] transition-colors">
-                        <span className="material-symbols-outlined" style={{fontSize:"18px"}}>more_vert</span>
-                      </button>
+                      <div className="relative">
+                        <button disabled={rowBusy === m.id} onClick={() => setMenuFor(menuFor === m.id ? null : m.id)} className="text-[#666666] hover:text-[#ba1a1a] transition-colors disabled:opacity-50">
+                          <span className="material-symbols-outlined" style={{fontSize:"18px"}}>more_vert</span>
+                        </button>
+                        {menuFor === m.id && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setMenuFor(null)} />
+                            <div className="absolute right-0 mt-1 z-20 w-52 bg-white border border-[#e4e2e1] rounded-lg shadow-lg overflow-hidden">
+                              <button onClick={() => handleCopyMemberLink(m.id)} className="w-full text-left px-4 py-2.5 text-[13px] text-[#333333] hover:bg-[#f8f8f8] flex items-center gap-2">
+                                <span className="material-symbols-outlined" style={{fontSize:"16px"}}>link</span> Copy registration link
+                              </button>
+                              <button onClick={() => handleRemove(m.id)} className="w-full text-left px-4 py-2.5 text-[13px] text-[#ba1a1a] hover:bg-[#ba1a1a]/5 flex items-center gap-2 border-t border-[#e4e2e1]">
+                                <span className="material-symbols-outlined" style={{fontSize:"16px"}}>delete</span> Remove member
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
