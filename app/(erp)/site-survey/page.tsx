@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadSurveys, saveSurveys, loadSurveyChecklist, saveSurveyChecklist } from "../data";
+import { loadSurveyPage, saveSurveys, saveSurveyChecklist } from "../data";
 
 type SurveyStatus = "Completed" | "In Review" | "Pending";
 
@@ -89,8 +89,10 @@ export default function SiteSurveyPage() {
 
   // Load surveys + checklist template from the database, then persist changes back.
   useEffect(() => {
-    loadSurveys().then(rows => setSurveys(rows as Survey[])).catch(err => console.warn("[Survey] load failed:", err)).finally(() => setLoaded(true));
-    loadSurveyChecklist().then(setChecklist).catch(err => console.warn("[Survey] checklist load failed:", err)).finally(() => setChecklistLoaded(true));
+    loadSurveyPage()
+      .then(d => { setSurveys(d.surveys as Survey[]); setChecklist(d.checklist); })
+      .catch(err => console.warn("[Survey] load failed:", err))
+      .finally(() => { setLoaded(true); setChecklistLoaded(true); });
   }, []);
 
   useEffect(() => {

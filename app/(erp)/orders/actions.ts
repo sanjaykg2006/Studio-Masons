@@ -25,6 +25,9 @@ export type InvoiceDTO = {
   tdsPct?: number;
   retentionHeld?: boolean;
   retentionAmount?: number;
+  taxLines?: { base: number; sgst: number; cgst: number; igst: number }[];
+  otherCharges?: number;
+  retentionEarlyRelease?: boolean;
   pmApprovedAt?: string;
   pmApprovedBy?: string;
   accountsApprovedBy?: string;
@@ -72,6 +75,9 @@ export async function loadInvoices(): Promise<InvoiceDTO[]> {
     tdsPct: num(r.tdsPct),
     retentionHeld: r.retentionHeld,
     retentionAmount: num(r.retentionAmount),
+    taxLines: (r.taxLines as InvoiceDTO["taxLines"]) ?? undefined,
+    otherCharges: num(r.otherCharges),
+    retentionEarlyRelease: r.retentionEarlyRelease,
     pmApprovedAt: str(r.pmApprovedAt),
     pmApprovedBy: str(r.pmApprovedBy),
     accountsApprovedBy: str(r.accountsApprovedBy),
@@ -105,6 +111,9 @@ export async function saveInvoices(list: InvoiceDTO[]): Promise<void> {
         tdsPct: i.tdsPct ?? null,
         retentionHeld: i.retentionHeld ?? false,
         retentionAmount: i.retentionAmount ?? null,
+        taxLines: i.taxLines ?? undefined,
+        otherCharges: i.otherCharges ?? null,
+        retentionEarlyRelease: i.retentionEarlyRelease ?? false,
         pmApprovedAt: i.pmApprovedAt ?? null,
         pmApprovedBy: i.pmApprovedBy ?? null,
         accountsApprovedBy: i.accountsApprovedBy ?? null,

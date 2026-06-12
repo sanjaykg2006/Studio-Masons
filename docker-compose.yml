@@ -1,0 +1,19 @@
+# Local-dev Postgres. Runs the database on your machine so dev queries don't
+# round-trip to the remote Supabase instance. Production is unaffected — it keeps
+# using DATABASE_URL/DIRECT_URL from .env. Bring it up with `docker compose up -d`.
+services:
+  db:
+    image: postgres:16
+    container_name: studio-masons-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: studio_masons
+    ports:
+      - "5432:5432"
+    volumes:
+      - studio-masons-pgdata:/var/lib/postgresql/data
+
+volumes:
+  studio-masons-pgdata:

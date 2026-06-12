@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import {
-  loadIntegrations, loadSyncLogs, loadFieldMappings, loadWebhooks,
+  loadErpIntegrationPage,
   toggleIntegration, saveIntegrationConfig, createIntegration, testIntegration,
   createWebhook, toggleWebhook, fireWebhook,
 } from "../data";
@@ -99,10 +99,14 @@ export default function ERPIntegrationPage() {
 
   // All ERP integration data is loaded from the database.
   useEffect(() => {
-    loadIntegrations().then(rows => setIntegrations(rows as Integration[])).catch(err => console.warn("[ERP] integrations load failed:", err));
-    loadSyncLogs().then(rows => setLogs(rows as SyncLog[])).catch(err => console.warn("[ERP] logs load failed:", err));
-    loadFieldMappings().then(rows => setFieldMappings(rows as FieldMap[])).catch(err => console.warn("[ERP] mappings load failed:", err));
-    loadWebhooks().then(rows => setWebhookList(rows as Webhook[])).catch(err => console.warn("[ERP] webhooks load failed:", err));
+    loadErpIntegrationPage()
+      .then(d => {
+        setIntegrations(d.integrations as Integration[]);
+        setLogs(d.logs as SyncLog[]);
+        setFieldMappings(d.fieldMappings as FieldMap[]);
+        setWebhookList(d.webhooks as Webhook[]);
+      })
+      .catch(err => console.warn("[ERP] load failed:", err));
   }, []);
   const [newWebhookOpen, setNewWebhookOpen] = useState(false);
   const [newWebhookUrl, setNewWebhookUrl] = useState("");

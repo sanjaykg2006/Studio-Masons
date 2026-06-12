@@ -685,6 +685,7 @@ export default function PurchaseOrdersPage() {
                 <div>
                   <label style={labelStyle}>TDS %</label>
                   <select value={advanceTdsPct} onChange={(e) => setAdvanceTdsPct(Number(e.target.value))} style={inputStyle}>
+                    <option value={0}>No TDS</option>
                     {[1, 2, 10].map((p) => <option key={p} value={p}>{p}%</option>)}
                   </select>
                 </div>

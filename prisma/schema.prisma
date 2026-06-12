@@ -229,6 +229,14 @@ model VendorInvoice {
   tdsPct             Decimal? @db.Decimal(5, 2)
   retentionHeld      Boolean  @default(false)
   retentionAmount    Decimal? @db.Decimal(15, 2)
+  // Up to 4 base-value lines, each with its own SGST/CGST/IGST %. Source of truth for
+  // the invoice's tax breakdown; baseValue/sgstPct/cgstPct/igstPct keep the aggregate /
+  // first-line values for legacy displays.
+  taxLines              Json?
+  // Flat charges added at accounts approval (freight/handling, etc.) — part of the TDS base.
+  otherCharges          Decimal? @db.Decimal(15, 2)
+  // When true, held retention may be paid before the 12-month window (bypassed).
+  retentionEarlyRelease Boolean  @default(false)
   pmApprovedAt       String?
   pmApprovedBy       String?
   accountsApprovedBy String?

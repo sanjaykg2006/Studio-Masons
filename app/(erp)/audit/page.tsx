@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadAudit, loadAuditProjects, saveAudit, type AuditSectionDTO, type AuditProjectDTO } from "../data";
+import { loadAuditPage, saveAudit, type AuditSectionDTO, type AuditProjectDTO } from "../data";
 
 type AuditSection = AuditSectionDTO;
 
@@ -12,8 +12,9 @@ export default function AuditPage() {
   const [auditProjects, setAuditProjects] = useState<AuditProjectDTO[]>([]);
 
   useEffect(() => {
-    loadAudit().then(setItems).catch((err) => console.warn("[Audit] load failed:", err));
-    loadAuditProjects().then(setAuditProjects).catch((err) => console.warn("[Audit] projects load failed:", err));
+    loadAuditPage()
+      .then((d) => { setItems(d.sections); setAuditProjects(d.auditProjects); })
+      .catch((err) => console.warn("[Audit] load failed:", err));
   }, []);
 
   const toggleSign = (si: number, ii: number) => {

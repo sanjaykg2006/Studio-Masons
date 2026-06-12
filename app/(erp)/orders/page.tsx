@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProject, type Invoice, type PayReq, type InvStatus, type ReqStatus } from "../../../contexts/ProjectContext";
-import { loadExpenses, saveExpenses, loadScope, saveScope } from "../data";
+import { loadOrdersPage, saveExpenses, saveScope } from "../data";
 
 // ── Types ─────────────────────────────────────────────────────────
 // Invoice & payment-request types now live in ProjectContext (shared + persisted).
@@ -12,6 +12,29 @@ type ExpStatus = "Pending PM Approval" | "Pending Billing Approval" | "Pending A
 
 interface Expense { id:string; category:string; description:string; project:string; amount:string; amountNum:number; date:string; by:string; fileObj?:File; status:ExpStatus; pmApprovedBy?:string; billingApprovedBy?:string; accountsApprovedBy?:string; }
 interface VScope  { id:string; vendor:string; project:string; scope:string; progress:number; status:ScopeStatus; dueDate:string; }
+
+// A single base-value line on an invoice, each with its own GST. Invoices carry up to
+// four — one mandatory, the rest optional.
+type TaxLine = { base:number; sgst:number; cgst:number; igst:number };
+type InvLineForm = { base:string; sgst:string; cgst:string; igst:string };
+const emptyInvLine = (): InvLineForm => ({ base:"", sgst:"9", cgst:"9", igst:"0" });
+const MAX_TAX_LINES = 4;
+
+// Single source of truth for the accounts-approval maths, shared by the live
+// recompute effect, the submit handler, and the modal's breakdown render. Other
+// charges are a flat add-on that sit inside the TDS base.
+function computeApproval(opts:{ lines:TaxLine[]; otherCharges:number; tdsPct:number; deductFromAdvance:boolean; advanceDeductAmt:number; holdRetention:boolean; advRemaining:number; }) {
+  const baseSum  = opts.lines.reduce((s,l)=>s + l.base, 0);
+  const gstSum   = opts.lines.reduce((s,l)=>s + l.base * (l.sgst + l.cgst + l.igst) / 100, 0);
+  const total    = baseSum + gstSum;
+  const subtotal = total + opts.otherCharges;
+  const deduct   = opts.deductFromAdvance ? Math.min(opts.advanceDeductAmt, subtotal, opts.advRemaining) : 0;
+  const afterAdvance = Math.max(0, subtotal - deduct);
+  const tdsAmount    = afterAdvance * opts.tdsPct / 100;
+  const retentionAmt = opts.holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+  const payable      = Math.max(0, afterAdvance - tdsAmount - retentionAmt);
+  return { baseSum, gstSum, total, subtotal, deduct, afterAdvance, tdsAmount, retentionAmt, payable };
+}
 
 // ── Status styles ─────────────────────────────────────────────────
 const INV_STYLE: Record<InvStatus, React.CSSProperties> = {
@@ -66,8 +89,10 @@ export default function OrdersPage() {
 
   // Site expenses + vendor scope load from the database and persist on change.
   useEffect(() => {
-    loadExpenses().then(rows => setExpenses(rows as Expense[])).catch(err => console.warn("[Orders] expenses load failed:", err));
-    loadScope().then(rows => setScope(rows as VScope[])).catch(err => console.warn("[Orders] scope load failed:", err)).finally(() => setOrdersLoaded(true));
+    loadOrdersPage()
+      .then(d => { setExpenses(d.expenses as Expense[]); setScope(d.scope as VScope[]); })
+      .catch(err => console.warn("[Orders] load failed:", err))
+      .finally(() => setOrdersLoaded(true));
   }, []);
   useEffect(() => {
     if (!ordersLoaded) return;
@@ -123,13 +148,15 @@ export default function OrdersPage() {
   const [approveRemarks, setApproveRemarks] = useState("");
   const [approveBy, setApproveBy] = useState("Arjun K.");
   const [approveTdsPct, setApproveTdsPct] = useState<number>(2);
-  // GST confirmed / adjusted by accounts at approval — drives the invoice total.
-  const [approveSgstPct, setApproveSgstPct] = useState<number>(9);
-  const [approveCgstPct, setApproveCgstPct] = useState<number>(9);
-  const [approveIgstPct, setApproveIgstPct] = useState<number>(0);
+  // Per-line tax (base + SGST/CGST/IGST) confirmed / adjusted by accounts at approval.
+  const [approveTaxLines, setApproveTaxLines] = useState<TaxLine[]>([]);
+  // Flat other charges added at approval — part of the TDS base.
+  const [approveOtherCharges, setApproveOtherCharges] = useState("0");
   const [deductFromAdvance, setDeductFromAdvance] = useState(false);
   const [advanceDeductAmt, setAdvanceDeductAmt] = useState("0");
   const [holdRetention, setHoldRetention] = useState(false);
+  // Bypass the 12-month retention hold — makes the held amount payable now.
+  const [retentionEarly, setRetentionEarly] = useState(false);
   const [amountPayable, setAmountPayable] = useState("0");
 
   // Raise payment request from invoice states
@@ -155,6 +182,8 @@ export default function OrdersPage() {
   // New Request modal
   const [showNew, setShowNew]       = useState(false);
   const [newForm, setNewForm]       = useState<Record<string, string>>({});
+  // Up to four base-value lines for a new invoice; line 1 is mandatory.
+  const [invLines, setInvLines]     = useState<InvLineForm[]>([emptyInvLine()]);
   const [newInvFile, setNewInvFile] = useState<File | null>(null);
   const newInvFileRef               = useRef<HTMLInputElement>(null);
   const [mounted, setMounted]       = useState(false);
@@ -210,30 +239,37 @@ export default function OrdersPage() {
         setApproveRemarks("");
         setApproveBy("Arjun K.");
         setApproveTdsPct(2);
-        setApproveSgstPct(inv.sgstPct ?? 9);
-        setApproveCgstPct(inv.cgstPct ?? 9);
-        setApproveIgstPct(inv.igstPct ?? 0);
+        // Seed the per-line tax editor from the invoice's lines (fall back to its
+        // single base/GST values for invoices raised before multi-line support).
+        setApproveTaxLines(inv.taxLines && inv.taxLines.length
+          ? inv.taxLines.map(l => ({ ...l }))
+          : [{ base: inv.baseValue ?? inv.amountNum, sgst: inv.sgstPct ?? 9, cgst: inv.cgstPct ?? 9, igst: inv.igstPct ?? 0 }]);
+        setApproveOtherCharges(String(inv.otherCharges ?? 0));
         setDeductFromAdvance(false);
         setAdvanceDeductAmt("0");
         setHoldRetention(false);
+        setRetentionEarly(inv.retentionEarlyRelease ?? false);
         setAmountPayable(String(inv.amountNum));
       }
     }
   }, [approvingInvId, invoices]);
 
-  // Recompute amount payable: total − advance deducted − TDS (on amount after advance) − 5% retention.
+  // Recompute amount payable: total + other charges − advance − TDS − 5% retention.
   useEffect(() => {
     if (!approvingInvId) return;
     const inv = invoices.find(x => x.id === approvingInvId);
     if (!inv) return;
-    const base         = inv.baseValue ?? inv.amountNum;
-    const total        = base + (base * (approveSgstPct + approveCgstPct + approveIgstPct)) / 100;
-    const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, vendorAdvanceRemaining(inv.vendor)) : 0;
-    const afterAdvance = Math.max(0, total - deduct);
-    const tdsAmount    = afterAdvance * approveTdsPct / 100;
-    const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
-    setAmountPayable(String(Math.max(0, afterAdvance - tdsAmount - retentionAmt)));
-  }, [approveSgstPct, approveCgstPct, approveIgstPct, approveTdsPct, deductFromAdvance, advanceDeductAmt, holdRetention, approvingInvId, invoices]);
+    const { payable } = computeApproval({
+      lines: approveTaxLines,
+      otherCharges: parseFloat(approveOtherCharges || "0"),
+      tdsPct: approveTdsPct,
+      deductFromAdvance,
+      advanceDeductAmt: parseFloat(advanceDeductAmt || "0"),
+      holdRetention,
+      advRemaining: vendorAdvanceRemaining(inv.vendor),
+    });
+    setAmountPayable(String(payable));
+  }, [approveTaxLines, approveOtherCharges, approveTdsPct, deductFromAdvance, advanceDeductAmt, holdRetention, approvingInvId, invoices]);
 
   // Effect to sync Raise Payment Request Modal values
   useEffect(() => {
@@ -289,28 +325,37 @@ export default function OrdersPage() {
     if (!approvingInvId) return;
     const inv = invoices.find(x => x.id === approvingInvId);
     if (!inv) return;
-    const base         = inv.baseValue ?? inv.amountNum;
-    const total        = base + (base * (approveSgstPct + approveCgstPct + approveIgstPct)) / 100;
-    const payVal       = parseFloat(amountPayable || "0");
-    const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, vendorAdvanceRemaining(inv.vendor)) : 0;
-    const afterAdvance = Math.max(0, total - deduct);
-    const tdsAmount    = afterAdvance * approveTdsPct / 100;
-    const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+    const otherCharges = parseFloat(approveOtherCharges || "0");
+    const { baseSum, subtotal, deduct, retentionAmt } = computeApproval({
+      lines: approveTaxLines,
+      otherCharges,
+      tdsPct: approveTdsPct,
+      deductFromAdvance,
+      advanceDeductAmt: parseFloat(advanceDeductAmt || "0"),
+      holdRetention,
+      advRemaining: vendorAdvanceRemaining(inv.vendor),
+    });
+    const payVal  = parseFloat(amountPayable || "0");
+    const first   = approveTaxLines[0];
 
     setInvoices(prev => prev.map(x => x.id === approvingInvId ? {
       ...x,
       status: "Approved",
       remarks: approveRemarks,
       accountsApprovedBy: approveBy,
-      sgstPct: approveSgstPct,
-      cgstPct: approveCgstPct,
-      igstPct: approveIgstPct,
-      amount: `₹${total.toLocaleString("en-IN")}`,
-      amountNum: total,
+      taxLines: approveTaxLines.map(l => ({ ...l })),
+      baseValue: baseSum,
+      sgstPct: first?.sgst,
+      cgstPct: first?.cgst,
+      igstPct: first?.igst,
+      otherCharges,
+      amount: `₹${subtotal.toLocaleString("en-IN")}`,
+      amountNum: subtotal,
       tdsPct: approveTdsPct,
       advanceDeducted: deduct,
       retentionHeld: holdRetention,
       retentionAmount: retentionAmt,
+      retentionEarlyRelease: holdRetention ? retentionEarly : false,
       amountPayable: payVal,
       requestedAmount: 0
     } : x));
@@ -357,7 +402,10 @@ export default function OrdersPage() {
   // payable already nets advance + TDS + retention, so held retention is not requestable.
   function invoiceRemaining(inv: Invoice) {
     const payable = inv.amountPayable ?? inv.amountNum;
-    return payable - (inv.requestedAmount ?? 0);
+    // Retention is normally locked out of the payable pool; when its 12-month hold is
+    // bypassed, the held amount becomes immediately requestable.
+    const retentionPool = inv.retentionHeld && inv.retentionEarlyRelease ? (inv.retentionAmount ?? 0) : 0;
+    return payable + retentionPool - (inv.requestedAmount ?? 0);
   }
   function raiseFromInvoice(inv: Invoice) {
     // Only allowed when project team has approved the invoice and budget remains
@@ -447,6 +495,7 @@ export default function OrdersPage() {
     setUploadError(null);
     setNewInvFile(null);
     setExpenseFile(null);
+    setInvLines([emptyInvLine()]);
   }
 
   // Cumulative base value (pre-GST) invoiced for a vendor on a project — PO utilization
@@ -493,13 +542,14 @@ export default function OrdersPage() {
         }
       }
 
-      // Gate 3 — the invoice amount is needed to enforce the PO cap.
-      const baseVal = parseFloat(newForm.baseValue || "0");
-      const sgstPct = parseFloat(newForm.sgstPct || "9");
-      const cgstPct = parseFloat(newForm.cgstPct || "9");
-      const igstPct = parseFloat(newForm.igstPct || "0");
-      const amt = baseVal + (baseVal * (sgstPct + cgstPct + igstPct)) / 100;
-      if (!amt || amt <= 0) {
+      // Gate 3 — at least one valid base value is needed to enforce the PO cap.
+      // Only lines with a positive base count; line 1 is mandatory, the rest optional.
+      const taxLines: TaxLine[] = invLines
+        .map(l => ({ base: parseFloat(l.base || "0"), sgst: parseFloat(l.sgst || "0"), cgst: parseFloat(l.cgst || "0"), igst: parseFloat(l.igst || "0") }))
+        .filter(l => l.base > 0);
+      const baseVal = taxLines.reduce((s, l) => s + l.base, 0);
+      const amt     = taxLines.reduce((s, l) => s + l.base + (l.base * (l.sgst + l.cgst + l.igst)) / 100, 0);
+      if (!baseVal || baseVal <= 0) {
         setUploadError("Enter a valid base value so the total amount can be checked against the purchase order.");
         return;
       }
@@ -516,6 +566,7 @@ export default function OrdersPage() {
         return;
       }
 
+      const first = taxLines[0];
       const n: Invoice = {
         id: `SM-INV-${Date.now().toString().slice(-4)}`,
         vendor: vendorName,
@@ -525,14 +576,16 @@ export default function OrdersPage() {
         due: newForm.due || "TBD",
         status: "Approval Pending",
         fileObj: newInvFile,
+        taxLines,
         baseValue: baseVal,
-        sgstPct: sgstPct,
-        cgstPct: cgstPct,
-        igstPct: igstPct,
+        sgstPct: first.sgst,
+        cgstPct: first.cgst,
+        igstPct: first.igst,
         requestedAmount: 0,
       };
       setInvoices(prev => [n, ...prev]);
       setNewInvFile(null);
+      setInvLines([emptyInvLine()]);
       setUploadError(null);
       logActivity({ icon: "cloud_upload", color: "#e30613", route: "/orders", text: "Invoice submitted for", bold: projectName, detail: `Invoice ${n.id} from ${vendorName} for ${n.amount} uploaded — awaiting project-manager approval.` });
     } else if (activeTab === 1) {
@@ -681,7 +734,7 @@ export default function OrdersPage() {
             Export CSV
           </button>
           {/* Hide New Request on Tab 1 — payment requests come from invoices only */}
-          {activeTab !== 1 && <button onClick={() => { setNewForm({}); setNewInvFile(null); setExpenseFile(null); setUploadError(null); setShowNew(true); }}
+          {activeTab !== 1 && <button onClick={() => { setNewForm({}); setNewInvFile(null); setExpenseFile(null); setInvLines([emptyInvLine()]); setUploadError(null); setShowNew(true); }}
             style={{ padding:"10px 20px", border:"none", borderRadius:"8px", background:"#e30613", color:"white", fontSize:"13px", fontWeight:"bold", cursor:"pointer", display:"flex", alignItems:"center", gap:"6px" }}
             onMouseEnter={e => { e.currentTarget.style.opacity="0.88"; }}
             onMouseLeave={e => { e.currentTarget.style.opacity="1"; }}>
@@ -1505,12 +1558,15 @@ export default function OrdersPage() {
                 const selPO      = selectedProject && selVendor ? getVendorPO(selectedProject.id, selVendor) : undefined;
                 const invoicedSoFar = selPO ? vendorInvoiceTotal(selVendor, proj || "") : 0;
                 const remaining  = selPO ? selPO.poValue - invoicedSoFar : 0;
-                 const baseValueVal = parseFloat(f("baseValue") || "0");
-                 const sgstPctVal = parseFloat(f("sgstPct") || "9");
-                 const cgstPctVal = parseFloat(f("cgstPct") || "9");
-                 const igstPctVal = parseFloat(f("igstPct") || "0");
-                 const amtNum     = baseValueVal + (baseValueVal * (sgstPctVal + cgstPctVal + igstPctVal)) / 100;
-                const overCap    = !!selPO && baseValueVal > 0 && baseValueVal > remaining;
+                // Aggregate across every base-value line that has a positive base.
+                const parsedLines  = invLines.map(l => ({ base: parseFloat(l.base || "0"), sgst: parseFloat(l.sgst || "0"), cgst: parseFloat(l.cgst || "0"), igst: parseFloat(l.igst || "0") }));
+                const baseValueVal = parsedLines.reduce((s, l) => s + (l.base > 0 ? l.base : 0), 0);
+                const amtNum       = parsedLines.reduce((s, l) => s + (l.base > 0 ? l.base + (l.base * (l.sgst + l.cgst + l.igst)) / 100 : 0), 0);
+                const overCap      = !!selPO && baseValueVal > 0 && baseValueVal > remaining;
+                const setLine = (idx: number, key: keyof InvLineForm, value: string) => {
+                  setInvLines(prev => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l));
+                  setUploadError(null);
+                };
 
                 if (projectPOs.length === 0) {
                   return (
@@ -1567,42 +1623,65 @@ export default function OrdersPage() {
                       </div>
                     )}
 
-                    {/* Base Value + SGST + CGST + IGST + Calculated Total + Date */}
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Base Value (₹) <span style={{ color:"#e30613" }}>*</span></label>
-                        <input type="number" min="0" value={f("baseValue")} onChange={e=>{ sf("baseValue", e.target.value); setUploadError(null); }} placeholder="0.00"
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Invoice Date</label>
-                        <input type="date" value={f("due")} onChange={e=>sf("due",e.target.value)} style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
+                    {/* Invoice date */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                      <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Invoice Date</label>
+                      <input type="date" value={f("due")} onChange={e=>sf("due",e.target.value)} style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
                     </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>SGST (%) <span style={{ color:"#e30613" }}>*</span></label>
-                        <input type="number" min="0" value={f("sgstPct")} onChange={e=>{ sf("sgstPct", e.target.value); setUploadError(null); }} placeholder="9"
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>CGST (%) <span style={{ color:"#e30613" }}>*</span></label>
-                        <input type="number" min="0" value={f("cgstPct")} onChange={e=>{ sf("cgstPct", e.target.value); setUploadError(null); }} placeholder="9"
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>IGST (%)</label>
-                        <input type="number" min="0" value={f("igstPct")} onChange={e=>{ sf("igstPct", e.target.value); setUploadError(null); }} placeholder="0"
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
+
+                    {/* Base-value lines — up to four, each with its own GST. Line 1 is required. */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                      <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Base Values &amp; GST</label>
+                      {invLines.map((line, idx) => (
+                        <div key={idx} style={{ border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px", display:"flex", flexDirection:"column", gap:"10px", background: idx === 0 ? "#ffffff" : "#fbfbfb" }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                            <span style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>
+                              Base Value {idx + 1}{idx === 0 ? <span style={{ color:"#e30613" }}> *</span> : <span style={{ color:"#999999", fontWeight:"normal", textTransform:"none" }}> (optional)</span>}
+                            </span>
+                            {idx > 0 && (
+                              <button type="button" onClick={() => { setInvLines(prev => prev.filter((_, i) => i !== idx)); setUploadError(null); }}
+                                style={{ background:"none", border:"none", cursor:"pointer", color:"#999999", display:"flex", alignItems:"center" }} title="Remove this base value">
+                                <span className="material-symbols-outlined" style={{ fontSize:"18px" }}>close</span>
+                              </button>
+                            )}
+                          </div>
+                          <input type="number" min="0" value={line.base} onChange={e => setLine(idx, "base", e.target.value)} placeholder="Base value (₹)"
+                            style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"10px" }}>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>SGST %</label>
+                              <input type="number" min="0" value={line.sgst} onChange={e => setLine(idx, "sgst", e.target.value)} placeholder="9"
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>CGST %</label>
+                              <input type="number" min="0" value={line.cgst} onChange={e => setLine(idx, "cgst", e.target.value)} placeholder="9"
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>IGST %</label>
+                              <input type="number" min="0" value={line.igst} onChange={e => setLine(idx, "igst", e.target.value)} placeholder="0"
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {invLines.length < MAX_TAX_LINES && (
+                        <button type="button" onClick={() => setInvLines(prev => [...prev, emptyInvLine()])}
+                          style={{ alignSelf:"flex-start", display:"flex", alignItems:"center", gap:"6px", border:"1px dashed #e4e2e1", borderRadius:"6px", background:"white", color:"#e30613", fontSize:"12px", fontWeight:"bold", padding:"8px 12px", cursor:"pointer" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>add</span>
+                          Add base value ({invLines.length}/{MAX_TAX_LINES})
+                        </button>
+                      )}
                     </div>
+
                     <div style={{ display:"flex", flexDirection:"column", gap:"6px", background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px" }}>
                       <span style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>Calculated Invoice Total</span>
                       <span style={{ fontSize:"18px", fontWeight:"bold", color: overCap ? "#ba1a1a" : "#333333" }}>
                         ₹{amtNum.toLocaleString("en-IN")}
                       </span>
                       {overCap && (
-                        <span style={{ fontSize:"11px", color:"#ba1a1a" }}>Base value exceeds remaining PO balance by ₹{(baseValueVal - remaining).toLocaleString("en-IN")}</span>
+                        <span style={{ fontSize:"11px", color:"#ba1a1a" }}>Total base value exceeds remaining PO balance by ₹{(baseValueVal - remaining).toLocaleString("en-IN")}</span>
                       )}
                     </div>
 
@@ -1764,7 +1843,7 @@ export default function OrdersPage() {
                 const hasPOForProject = selectedProject ? getProjectVendorPOs(selectedProject.id).length > 0 : false;
                 const disabled = 
                   (activeTab === 0 && (
-                    !hasPOForProject || !newInvFile || !f("vendor") || !(parseFloat(f("baseValue") || "0") > 0)
+                    !hasPOForProject || !newInvFile || !f("vendor") || !(parseFloat(invLines[0]?.base || "0") > 0)
                   )) ||
                   (activeTab === 2 && (
                     !expenseFile || !(parseFloat(f("amount") || "0") > 0) || !f("description")
@@ -1818,7 +1897,7 @@ export default function OrdersPage() {
                   <div>
                     <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Total Invoice Amount</span>
                     <p style={{ fontSize:"13px", fontWeight:"bold", color:"#e30613" }}>
-                      ₹{((inv.baseValue ?? inv.amountNum) * (1 + (approveSgstPct + approveCgstPct + approveIgstPct) / 100)).toLocaleString("en-IN")}
+                      ₹{(approveTaxLines.reduce((s, l) => s + l.base + (l.base * (l.sgst + l.cgst + l.igst)) / 100, 0) + parseFloat(approveOtherCharges || "0")).toLocaleString("en-IN")}
                     </p>
                   </div>
                 </div>
@@ -1854,40 +1933,55 @@ export default function OrdersPage() {
                   </div>
 
                   <div style={{ borderTop:"1px solid #e4e2e1", paddingTop:"12px", marginTop:"4px", display:"flex", flexDirection:"column", gap:"14px" }}>
-                    <span style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Tax (GST)</span>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#666666" }}>
-                      <span>Base Value</span>
-                      <span style={{ fontWeight:600, color:"#333333" }}>₹{(inv.baseValue ?? inv.amountNum).toLocaleString("en-IN")}</span>
-                    </div>
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px" }}>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>SGST %</label>
-                        <input type="number" min="0" value={approveSgstPct} onChange={e => setApproveSgstPct(Number(e.target.value) || 0)}
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>CGST %</label>
-                        <input type="number" min="0" value={approveCgstPct} onChange={e => setApproveCgstPct(Number(e.target.value) || 0)}
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
-                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
-                        <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>IGST %</label>
-                        <input type="number" min="0" value={approveIgstPct} onChange={e => setApproveIgstPct(Number(e.target.value) || 0)}
-                          style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
-                      </div>
+                    <span style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Base Values &amp; GST</span>
+                    {/* Per-line GST — accounts confirm/adjust each base value's SGST/CGST/IGST. */}
+                    {approveTaxLines.map((line, idx) => {
+                      const setGst = (key: "sgst" | "cgst" | "igst", value: number) =>
+                        setApproveTaxLines(prev => prev.map((l, i) => i === idx ? { ...l, [key]: value } : l));
+                      return (
+                        <div key={idx} style={{ border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px", display:"flex", flexDirection:"column", gap:"10px" }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#666666" }}>
+                            <span>Base Value {approveTaxLines.length > 1 ? idx + 1 : ""}</span>
+                            <span style={{ fontWeight:600, color:"#333333" }}>₹{line.base.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"10px" }}>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>SGST %</label>
+                              <input type="number" min="0" value={line.sgst} onChange={e => setGst("sgst", Number(e.target.value) || 0)}
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>CGST %</label>
+                              <input type="number" min="0" value={line.cgst} onChange={e => setGst("cgst", Number(e.target.value) || 0)}
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                            <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                              <label style={{ fontSize:"10px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>IGST %</label>
+                              <input type="number" min="0" value={line.igst} onChange={e => setGst("igst", Number(e.target.value) || 0)}
+                                style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"9px 10px", fontSize:"13px", outline:"none" }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Other charges — flat add-on, part of the TDS base */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                      <label style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Other Charges (₹)</label>
+                      <input type="number" min="0" value={approveOtherCharges} onChange={e => setApproveOtherCharges(e.target.value)} placeholder="0.00"
+                        style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
+                      <span style={{ fontSize:"10px", color:"#999999" }}>Freight, handling, etc. Added to the amount payable and the TDS base.</span>
                     </div>
                     <span style={{ fontSize:"11px", fontWeight:"bold", color:"#e30613", textTransform:"uppercase" }}>Financial Breakdown</span>
                     {(() => {
                       const advRemaining = vendorAdvanceRemaining(inv.vendor);
-                      const base         = inv.baseValue ?? inv.amountNum;
-                      const sgstAmount   = base * approveSgstPct / 100;
-                      const cgstAmount   = base * approveCgstPct / 100;
-                      const igstAmount   = base * approveIgstPct / 100;
-                      const total        = base + sgstAmount + cgstAmount + igstAmount;
-                      const deduct       = deductFromAdvance ? Math.min(parseFloat(advanceDeductAmt || "0"), total, advRemaining) : 0;
-                      const afterAdvance = Math.max(0, total - deduct);
-                      const tdsAmount    = afterAdvance * approveTdsPct / 100;
-                      const retentionAmt = holdRetention ? (afterAdvance - tdsAmount) * 0.05 : 0;
+                      const otherCharges = parseFloat(approveOtherCharges || "0");
+                      const { baseSum: base, subtotal, deduct, afterAdvance, tdsAmount, retentionAmt } = computeApproval({
+                        lines: approveTaxLines, otherCharges, tdsPct: approveTdsPct,
+                        deductFromAdvance, advanceDeductAmt: parseFloat(advanceDeductAmt || "0"), holdRetention, advRemaining,
+                      });
+                      const sgstAmount   = approveTaxLines.reduce((s, l) => s + l.base * l.sgst / 100, 0);
+                      const cgstAmount   = approveTaxLines.reduce((s, l) => s + l.base * l.cgst / 100, 0);
+                      const igstAmount   = approveTaxLines.reduce((s, l) => s + l.base * l.igst / 100, 0);
                       const rowStyle: React.CSSProperties = { display:"flex", justifyContent:"space-between", fontSize:"12px", color:"#666666" };
                       return (
                         <>
@@ -1900,7 +1994,7 @@ export default function OrdersPage() {
                                 <span style={{ fontSize:"11px", color:"#a16207", marginLeft:"auto" }}>₹{advRemaining.toLocaleString("en-IN")} available</span>
                               </label>
                               {deductFromAdvance && (
-                                <input type="number" min="0" max={Math.min(total, advRemaining)} value={advanceDeductAmt} onChange={e => setAdvanceDeductAmt(e.target.value)}
+                                <input type="number" min="0" max={Math.min(subtotal, advRemaining)} value={advanceDeductAmt} onChange={e => setAdvanceDeductAmt(e.target.value)}
                                   style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none" }} />
                               )}
                             </div>
@@ -1911,6 +2005,7 @@ export default function OrdersPage() {
                               <label style={{ fontSize:"11px", fontWeight:"bold", color:"#666666", textTransform:"uppercase" }}>TDS %</label>
                               <select value={approveTdsPct} onChange={e => setApproveTdsPct(Number(e.target.value))}
                                 style={{ border:"1px solid #e4e2e1", borderRadius:"6px", padding:"10px 12px", fontSize:"13px", outline:"none", background:"white" }}>
+                                <option value={0}>No TDS</option>
                                 {[1,2,10].map(p => <option key={p} value={p}>{p}%</option>)}
                               </select>
                             </div>
@@ -1926,15 +2021,28 @@ export default function OrdersPage() {
                               <span style={{ fontSize:"13px", fontWeight:"500", color:"#333333" }}>Hold 5% Retention</span>
                               {holdRetention && <span style={{ fontSize:"11px", color:"#a16207", marginLeft:"auto" }}>₹{retentionAmt.toLocaleString("en-IN")}</span>}
                             </label>
-                            {holdRetention && <span style={{ fontSize:"10px", color:"#999999" }}>Retention releasable 12 months after project completion.</span>}
+                            {holdRetention && (
+                              <>
+                                <label style={{ display:"flex", alignItems:"center", gap:"8px", cursor:"pointer", paddingLeft:"24px" }}>
+                                  <input type="checkbox" checked={retentionEarly} onChange={e => setRetentionEarly(e.target.checked)} style={{ width:"15px", height:"15px", accentColor:"#0059a8" }} />
+                                  <span style={{ fontSize:"12px", color:"#333333" }}>Allow early payment (bypass 12-month hold)</span>
+                                </label>
+                                <span style={{ fontSize:"10px", color:"#999999" }}>
+                                  {retentionEarly
+                                    ? "Retention may be paid before 12 months — the held amount becomes requestable immediately."
+                                    : "Retention releasable 12 months after project completion."}
+                                </span>
+                              </>
+                            )}
                           </div>
                           {/* Summary */}
                           <div style={{ background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"8px", padding:"12px 14px", display:"flex", flexDirection:"column", gap:"5px" }}>
-                            <div style={rowStyle}><span>Base Value</span><span style={{ color:"#333333", fontWeight:600 }}>₹{base.toLocaleString("en-IN")}</span></div>
-                            {approveSgstPct > 0 && <div style={rowStyle}><span>SGST ({approveSgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{sgstAmount.toLocaleString("en-IN")}</span></div>}
-                            {approveCgstPct > 0 && <div style={rowStyle}><span>CGST ({approveCgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{cgstAmount.toLocaleString("en-IN")}</span></div>}
-                            {approveIgstPct > 0 && <div style={rowStyle}><span>IGST ({approveIgstPct}%)</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{igstAmount.toLocaleString("en-IN")}</span></div>}
-                            <div style={rowStyle}><span>Invoice Total</span><span style={{ color:"#333333", fontWeight:600 }}>₹{total.toLocaleString("en-IN")}</span></div>
+                            <div style={rowStyle}><span>Base Value{approveTaxLines.length > 1 ? ` (${approveTaxLines.length} lines)` : ""}</span><span style={{ color:"#333333", fontWeight:600 }}>₹{base.toLocaleString("en-IN")}</span></div>
+                            {sgstAmount > 0 && <div style={rowStyle}><span>SGST</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{sgstAmount.toLocaleString("en-IN")}</span></div>}
+                            {cgstAmount > 0 && <div style={rowStyle}><span>CGST</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{cgstAmount.toLocaleString("en-IN")}</span></div>}
+                            {igstAmount > 0 && <div style={rowStyle}><span>IGST</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{igstAmount.toLocaleString("en-IN")}</span></div>}
+                            {otherCharges > 0 && <div style={rowStyle}><span>Other Charges</span><span style={{ color:"#333333", fontWeight:600 }}>+₹{otherCharges.toLocaleString("en-IN")}</span></div>}
+                            <div style={rowStyle}><span>Invoice Total</span><span style={{ color:"#333333", fontWeight:600 }}>₹{subtotal.toLocaleString("en-IN")}</span></div>
                             {deduct > 0 && <div style={rowStyle}><span>Advance Deducted</span><span style={{ color:"#ba1a1a", fontWeight:600 }}>−₹{deduct.toLocaleString("en-IN")}</span></div>}
                             <div style={rowStyle}><span>After Advance</span><span style={{ color:"#333333", fontWeight:600 }}>₹{afterAdvance.toLocaleString("en-IN")}</span></div>
                             <div style={rowStyle}><span>TDS ({approveTdsPct}%)</span><span style={{ color:"#ba1a1a", fontWeight:600 }}>−₹{tdsAmount.toLocaleString("en-IN")}</span></div>
@@ -2004,10 +2112,17 @@ export default function OrdersPage() {
                   {(inv.retentionHeld && (inv.retentionAmount ?? 0) > 0) && (
                     <div style={{ gridColumn:"1 / -1" }}>
                       <span style={{ fontSize:"9px", fontWeight:"bold", textTransform:"uppercase", color:"#999999" }}>Retention Held (5%)</span>
-                      <p style={{ fontSize:"13px", fontWeight:"bold", color:"#a16207", display:"flex", alignItems:"center", gap:"4px" }}>
-                        <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>lock</span>
-                        ₹{(inv.retentionAmount ?? 0).toLocaleString("en-IN")} locked until 12 months after completion
-                      </p>
+                      {inv.retentionEarlyRelease ? (
+                        <p style={{ fontSize:"13px", fontWeight:"bold", color:"#16a34a", display:"flex", alignItems:"center", gap:"4px" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>lock_open</span>
+                          ₹{(inv.retentionAmount ?? 0).toLocaleString("en-IN")} eligible for early release — included in remaining
+                        </p>
+                      ) : (
+                        <p style={{ fontSize:"13px", fontWeight:"bold", color:"#a16207", display:"flex", alignItems:"center", gap:"4px" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>lock</span>
+                          ₹{(inv.retentionAmount ?? 0).toLocaleString("en-IN")} locked until 12 months after completion
+                        </p>
+                      )}
                     </div>
                   )}
                   <div style={{ gridColumn:"1 / -1" }}>

@@ -355,6 +355,37 @@ export async function testIntegration(id: string): Promise<{ integration: Integr
   };
 }
 
+// ── Per-page batched loaders ──────────────────────────────────────
+// Each page used to fire its loaders as separate server actions, which Next.js
+// serializes (one round-trip each). These batch a page's reads into a single
+// action whose queries run concurrently server-side — one round-trip per page.
+export async function loadErpIntegrationPage() {
+  const [integrations, logs, fieldMappings, webhooks] = await Promise.all([
+    loadIntegrations(), loadSyncLogs(), loadFieldMappings(), loadWebhooks(),
+  ]);
+  return { integrations, logs, fieldMappings, webhooks };
+}
+export async function loadDlpPage() {
+  const [tickets, amcSchedule] = await Promise.all([loadDlpTickets(), loadAmcSchedule()]);
+  return { tickets, amcSchedule };
+}
+export async function loadOrdersPage() {
+  const [expenses, scope] = await Promise.all([loadExpenses(), loadScope()]);
+  return { expenses, scope };
+}
+export async function loadAuditPage() {
+  const [sections, auditProjects] = await Promise.all([loadAudit(), loadAuditProjects()]);
+  return { sections, auditProjects };
+}
+export async function loadSurveyPage() {
+  const [surveys, checklist] = await Promise.all([loadSurveys(), loadSurveyChecklist()]);
+  return { surveys, checklist };
+}
+export async function loadQualityPage() {
+  const [inspections, checklist] = await Promise.all([loadInspections(), loadQualityChecklist()]);
+  return { inspections, checklist };
+}
+
 export async function createWebhook(input: { name: string; url: string; events?: string[] }): Promise<WebhookDTO> {
   const max = await prisma.erpWebhook.aggregate({ _max: { sortOrder: true } });
   const row = await prisma.erpWebhook.create({

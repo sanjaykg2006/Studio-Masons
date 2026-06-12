@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadDlpTickets, loadAmcSchedule, type DlpTicketDTO, type AmcScheduleDTO } from "../data";
+import { loadDlpPage, type DlpTicketDTO, type AmcScheduleDTO } from "../data";
 
 export default function DLPPage() {
   const { selectedProject, team, projects } = useProject();
@@ -10,8 +10,9 @@ export default function DLPPage() {
   const [amcSchedule, setAmcSchedule] = useState<AmcScheduleDTO[]>([]);
 
   useEffect(() => {
-    loadDlpTickets().then(setTickets).catch((err) => console.warn("[DLP] tickets load failed:", err));
-    loadAmcSchedule().then(setAmcSchedule).catch((err) => console.warn("[DLP] amc load failed:", err));
+    loadDlpPage()
+      .then((d) => { setTickets(d.tickets); setAmcSchedule(d.amcSchedule); })
+      .catch((err) => console.warn("[DLP] load failed:", err));
   }, []);
 
   const visibleTickets = selectedProject

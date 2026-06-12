@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadInspections, saveInspections, loadQualityChecklist, type QualityChecklistDTO } from "../data";
+import { loadQualityPage, saveInspections, type QualityChecklistDTO } from "../data";
 
 type Result = "Pass" | "Fail" | "Conditional" | "Draft";
 
@@ -63,8 +63,10 @@ export default function QualityPage() {
 
   // Load inspections + checklist template from the database, then persist changes.
   useEffect(() => {
-    loadInspections().then(rows => setInspections(rows as Inspection[])).catch(err => console.warn("[Quality] load failed:", err)).finally(() => setHydrated(true));
-    loadQualityChecklist().then(t => { setTemplate(t); setChecks2(freshChecklist(t)); }).catch(err => console.warn("[Quality] checklist load failed:", err));
+    loadQualityPage()
+      .then(d => { setInspections(d.inspections as Inspection[]); setTemplate(d.checklist); setChecks2(freshChecklist(d.checklist)); })
+      .catch(err => console.warn("[Quality] load failed:", err))
+      .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {

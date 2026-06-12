@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, type ReactNode, type Dispatch, type SetStateAction } from "react";
+import { loadBootstrap } from "@/app/(erp)/bootstrap";
 import {
-  loadPurchaseOrders,
   savePurchaseOrder,
   deletePurchaseOrder,
   acceptPurchaseOrder,
@@ -10,18 +10,13 @@ import {
   type POLine,
 } from "@/app/(erp)/purchase-orders/actions";
 import {
-  loadInvoices,
   saveInvoices,
-  loadPaymentRequests,
   savePaymentRequests,
   type InvoiceDTO,
   type PaymentRequestDTO,
 } from "@/app/(erp)/orders/actions";
 import {
-  loadAppProjects,
   saveProjectPct,
-  loadTeam,
-  loadActivities,
   saveActivities,
   type AppProjectDTO,
   type TeamMemberDTO,
@@ -85,7 +80,8 @@ export type InvStatus = "Approval Pending" | "PM Approved" | "Approved" | "Rejec
 // Payment request workflow: project team raises → accounts approves → accounts marks paid
 export type ReqStatus = "Pending Accounts Approval" | "Approved by Accounts" | "Paid";
 
-export interface Invoice { id:string; vendor:string; project:string; amount:string; amountNum:number; due:string; status:InvStatus; flagged?:boolean; fileObj?:File; fileName?:string; baseValue?:number; sgstPct?:number; cgstPct?:number; igstPct?:number; remarks?:string; amountPayable?:number; requestedAmount?:number; advanceDeducted?:number; tdsPct?:number; retentionHeld?:boolean; retentionAmount?:number; pmApprovedAt?:string; pmApprovedBy?:string; accountsApprovedBy?:string; }
+export interface InvoiceTaxLine { base:number; sgst:number; cgst:number; igst:number; }
+export interface Invoice { id:string; vendor:string; project:string; amount:string; amountNum:number; due:string; status:InvStatus; flagged?:boolean; fileObj?:File; fileName?:string; baseValue?:number; sgstPct?:number; cgstPct?:number; igstPct?:number; taxLines?:InvoiceTaxLine[]; otherCharges?:number; remarks?:string; amountPayable?:number; requestedAmount?:number; advanceDeducted?:number; tdsPct?:number; retentionHeld?:boolean; retentionAmount?:number; retentionEarlyRelease?:boolean; pmApprovedAt?:string; pmApprovedBy?:string; accountsApprovedBy?:string; }
 export interface PayReq  { id:string; vendor:string; project:string; amount:string; amountNum:number; requested:string; status:ReqStatus; notes?:string; invoiceFile?:File; invoiceRef?:string; priority?:"Low" | "Medium" | "High"; accountsApprovedBy?:string; paidBy?:string; }
 
 // A single entry in the dashboard's Recent Activity feed. Generated as real actions
@@ -175,9 +171,11 @@ const STORAGE_KEY = "erp-selected-project";
 const toInvoiceDTO = (i: Invoice): InvoiceDTO => ({
   id: i.id, vendor: i.vendor, project: i.project, amount: i.amount, amountNum: i.amountNum,
   due: i.due, status: i.status, flagged: i.flagged, baseValue: i.baseValue, sgstPct: i.sgstPct,
-  cgstPct: i.cgstPct, igstPct: i.igstPct, remarks: i.remarks, amountPayable: i.amountPayable,
+  cgstPct: i.cgstPct, igstPct: i.igstPct, taxLines: i.taxLines, otherCharges: i.otherCharges,
+  remarks: i.remarks, amountPayable: i.amountPayable,
   requestedAmount: i.requestedAmount, advanceDeducted: i.advanceDeducted, tdsPct: i.tdsPct,
-  retentionHeld: i.retentionHeld, retentionAmount: i.retentionAmount, pmApprovedAt: i.pmApprovedAt,
+  retentionHeld: i.retentionHeld, retentionAmount: i.retentionAmount,
+  retentionEarlyRelease: i.retentionEarlyRelease, pmApprovedAt: i.pmApprovedAt,
   pmApprovedBy: i.pmApprovedBy, accountsApprovedBy: i.accountsApprovedBy,
   fileName: i.fileName ?? i.fileObj?.name,
 });
@@ -210,29 +208,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     // Load all shared stores from the database. The selected-project id (persisted
     // in localStorage) is validated against the loaded projects. hydrated flips only
     // after everything resolves, so the save effects don't write back empty state.
-    Promise.allSettled([
-      loadAppProjects()
-        .then((rows) => {
-          setRawProjects(rows);
-          if (stored && rows.some((p) => p.id === stored)) setSelectedId(stored);
-        })
-        .catch((err) => console.warn("[ProjectContext] Couldn't load projects:", err)),
-      loadTeam()
-        .then((rows) => setTeam(rows))
-        .catch((err) => console.warn("[ProjectContext] Couldn't load team:", err)),
-      loadActivities()
-        .then((rows) => setActivities(rows as ActivityItem[]))
-        .catch((err) => console.warn("[ProjectContext] Couldn't load activity:", err)),
-      loadPurchaseOrders()
-        .then((pos) => setVendorPOs(pos as VendorPO[]))
-        .catch((err) => console.warn("[ProjectContext] Couldn't load purchase orders:", err)),
-      loadInvoices()
-        .then((rows) => setInvoices(rows.map(fromInvoiceDTO)))
-        .catch((err) => console.warn("[ProjectContext] Couldn't load invoices:", err)),
-      loadPaymentRequests()
-        .then((rows) => setRequests(rows.map(fromReqDTO)))
-        .catch((err) => console.warn("[ProjectContext] Couldn't load payment requests:", err)),
-    ]).finally(() => setHydrated(true));
+    loadBootstrap()
+      .then((b) => {
+        setRawProjects(b.projects);
+        if (stored && b.projects.some((p) => p.id === stored)) setSelectedId(stored);
+        setTeam(b.team);
+        setActivities(b.activities as ActivityItem[]);
+        setVendorPOs(b.purchaseOrders as VendorPO[]);
+        setInvoices(b.invoices.map(fromInvoiceDTO));
+        setRequests(b.paymentRequests.map(fromReqDTO));
+      })
+      .catch((err) => console.warn("[ProjectContext] Couldn't load bootstrap data:", err))
+      .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
