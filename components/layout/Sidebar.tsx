@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useNavigation } from "../../contexts/NavigationContext";
+import { useAppearance } from "../../contexts/AppearanceContext";
 
 // Lets browser shortcuts (open in new tab/window) keep working, otherwise
 // routes through the navigation transition so the loading overlay appears.
@@ -14,6 +15,7 @@ const navItems = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
   { href: "/site-survey", icon: "architecture", label: "Site Survey" },
   { href: "/design", icon: "design_services", label: "Design Management" },
+  { href: "/purchase-orders", icon: "request_quote", label: "Purchase Orders" },
   { href: "/orders", icon: "payments", label: "Orders & Expense" },
   { href: "/quality", icon: "fact_check", label: "Quality Checks" },
   { href: "/snags", icon: "report_problem", label: "Snags" },
@@ -26,8 +28,9 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { navigate } = useNavigation();
+  const { sidebarWidthClass } = useAppearance();
   return (
-    <aside className="fixed left-0 top-0 h-full flex flex-col py-6 bg-[#f8f8f8] border-r border-[#e4e2e1] w-64 z-50">
+    <aside className={`fixed left-0 top-0 h-full flex flex-col py-6 bg-[#f8f8f8] border-r border-[#e4e2e1] ${sidebarWidthClass} z-50 transition-all`}>
       <div className="px-6 mb-10">
         <Image src="/logo-full.jpg" alt="Studio Masons" width={180} height={90} className="w-full h-auto" priority />
       </div>

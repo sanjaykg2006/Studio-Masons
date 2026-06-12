@@ -1,25 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-
-const tickets = [
-  { id: "DLP-021", project: "Koramangala Villa", title: "Paint peeling in living room", category: "Finishing", reportedDate: "Nov 01, 2024", dueDate: "Dec 01, 2024", assignee: "Vikram R.", status: "Open", statusStyle: "bg-[#e30613]/10 text-[#e30613] border-[#e30613]/20", priority: "High", priorityStyle: "text-[#ba1a1a]", amcDue: null },
-  { id: "DLP-020", project: "Indiranagar Residence", title: "Door hinge squeak — master bedroom", category: "Joinery", reportedDate: "Oct 28, 2024", dueDate: "Nov 28, 2024", assignee: "Amit S.", status: "In Progress", statusStyle: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20", priority: "Medium", priorityStyle: "text-yellow-700", amcDue: null },
-  { id: "DLP-019", project: "Whitefield Office", title: "Annual HVAC filter replacement", category: "AMC", reportedDate: "Oct 20, 2024", dueDate: "Nov 20, 2024", assignee: "Sneha P.", status: "AMC Due", statusStyle: "bg-purple-500/10 text-purple-700 border-purple-500/20", priority: "Scheduled", priorityStyle: "text-purple-700", amcDue: "Nov 20, 2024" },
-  { id: "DLP-018", project: "Koramangala Villa", title: "Water seepage near window sill", category: "Civil", reportedDate: "Oct 15, 2024", dueDate: "Nov 15, 2024", assignee: "Rahul K.", status: "Resolved", statusStyle: "bg-green-500/10 text-green-600 border-green-500/20", priority: "High", priorityStyle: "text-[#ba1a1a]", amcDue: null },
-  { id: "DLP-017", project: "Indiranagar Residence", title: "Electrical socket loose — kitchen", category: "Electrical", reportedDate: "Oct 10, 2024", dueDate: "Nov 10, 2024", assignee: "Vikram R.", status: "Resolved", statusStyle: "bg-green-500/10 text-green-600 border-green-500/20", priority: "Medium", priorityStyle: "text-yellow-700", amcDue: null },
-];
-
-const amcSchedule = [
-  { service: "HVAC Filter Replacement", project: "Whitefield Office", nextDue: "Nov 20, 2024", frequency: "Quarterly", overdue: true },
-  { service: "Elevator Maintenance", project: "HSR Layout G+3", nextDue: "Dec 05, 2024", frequency: "Monthly", overdue: false },
-  { service: "Fire Extinguisher Check", project: "Koramangala Villa", nextDue: "Dec 15, 2024", frequency: "Annual", overdue: false },
-  { service: "Plumbing Inspection", project: "Indiranagar Residence", nextDue: "Jan 10, 2025", frequency: "Annual", overdue: false },
-];
+import { loadDlpTickets, loadAmcSchedule, type DlpTicketDTO, type AmcScheduleDTO } from "../data";
 
 export default function DLPPage() {
-  const { selectedProject } = useProject();
+  const { selectedProject, team, projects } = useProject();
   const [showModal, setShowModal] = useState(false);
+  const [tickets, setTickets] = useState<DlpTicketDTO[]>([]);
+  const [amcSchedule, setAmcSchedule] = useState<AmcScheduleDTO[]>([]);
+
+  useEffect(() => {
+    loadDlpTickets().then(setTickets).catch((err) => console.warn("[DLP] tickets load failed:", err));
+    loadAmcSchedule().then(setAmcSchedule).catch((err) => console.warn("[DLP] amc load failed:", err));
+  }, []);
 
   const visibleTickets = selectedProject
     ? tickets.filter(t => t.project === selectedProject.name)
@@ -99,7 +92,7 @@ export default function DLPPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e4e2e1]">
-              {tickets.map((t, i) => (
+              {visibleTickets.map((t, i) => (
                 <tr key={i} className="hover:bg-[#f8f8f8] transition-colors">
                   <td className="px-4 py-4 font-bold text-[#e30613] text-[13px]">{t.id}</td>
                   <td className="px-4 py-4">
@@ -164,7 +157,7 @@ export default function DLPPage() {
                 <div className="flex flex-col gap-2">
                   <label className="text-[13px] font-bold text-[#e30613] uppercase">Project</label>
                   <select className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]">
-                    <option>Indiranagar Residence</option><option>Koramangala Villa</option><option>Whitefield Office</option>
+                    {projects.map(p => <option key={p.id}>{p.name}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -186,7 +179,7 @@ export default function DLPPage() {
                 <div className="flex flex-col gap-2">
                   <label className="text-[13px] font-bold text-[#e30613] uppercase">Assign To</label>
                   <select className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]">
-                    <option>Vikram R.</option><option>Sneha P.</option><option>Amit S.</option><option>Rahul K.</option>
+                    {team.map(m => <option key={m.id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div className="flex flex-col gap-2">

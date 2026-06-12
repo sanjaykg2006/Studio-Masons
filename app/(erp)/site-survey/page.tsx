@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useProject } from "../../../contexts/ProjectContext";
+import { loadSurveys, saveSurveys, loadSurveyChecklist, saveSurveyChecklist } from "../data";
 
 type SurveyStatus = "Completed" | "In Review" | "Pending";
 
@@ -27,24 +29,8 @@ const STATUSES: SurveyStatus[] = ["Completed", "In Review", "Pending"];
 
 type ChecklistCategory = { category: string; items: string[] };
 
-const initialChecklist: ChecklistCategory[] = [
-  { category: "Physical Measurements", items: ["Floor dimensions verified", "Ceiling height measured", "Door/window openings noted", "Structural beam locations marked"] },
-  { category: "Site Conditions",        items: ["Existing plumbing mapped", "Electrical panel location", "Natural light assessment", "Ventilation points identified"] },
-  { category: "Media Documentation",   items: ["360° photos captured", "Video walkthrough recorded", "Defect close-ups documented", "Site access points photographed"] },
-];
-
-const ALL_ITEMS = initialChecklist.flatMap(c => c.items);
-
-const initialSurveys: Survey[] = [
-  { id: "SS-001", project: "Indiranagar Residence", date: "Nov 12, 2024", conductor: "Vikram R.", status: "Completed", photos: 18, type: "Initial Recce",  notes: "Site access confirmed. All measurements captured. No major structural concerns.", checkedItems: ALL_ITEMS },
-  { id: "SS-002", project: "Whitefield Office",     date: "Nov 10, 2024", conductor: "Sneha P.",  status: "In Review", photos: 22, type: "Progress Check", notes: "Awaiting sign-off from client. MEP routing flagged for review.",                  checkedItems: ALL_ITEMS.slice(0, 8) },
-  { id: "SS-003", project: "Koramangala Villa",     date: "Nov 08, 2024", conductor: "Amit S.",   status: "Completed", photos: 14, type: "Pre-Handover",   notes: "Final walkthrough completed. Snag list shared with client.",                      checkedItems: ALL_ITEMS },
-  { id: "SS-004", project: "HSR Layout G+3",        date: "Nov 05, 2024", conductor: "Rahul K.",  status: "Pending",   photos: 0,  type: "Initial Recce",  notes: "",                                                                                checkedItems: [] },
-];
-
-const ENGINEERS = ["Vikram R.", "Sneha P.", "Amit S.", "Rahul K.", "Priya M."];
-const PROJECTS  = ["Indiranagar Residence", "Whitefield Office", "Koramangala Villa", "HSR Layout G+3", "Jayanagar Apartment"];
-const TYPES     = ["Initial Recce", "Progress Check", "Pre-Handover", "Client Walkthrough"];
+// Survey types are UI config (workflow categories), not entity data.
+const TYPES = ["Initial Recce", "Progress Check", "Pre-Handover", "Client Walkthrough"];
 
 function nextId(surveys: Survey[]) {
   const nums = surveys.map(s => parseInt(s.id.replace("SS-", ""), 10));
@@ -53,7 +39,12 @@ function nextId(surveys: Survey[]) {
 
 export default function SiteSurveyPage() {
   const router = useRouter();
-  const [surveys, setSurveys] = useState<Survey[]>(initialSurveys);
+  const { projects, team } = useProject();
+  // Project / engineer dropdown options come from the database.
+  const PROJECTS = projects.map(p => p.name);
+  const ENGINEERS = team.map(m => m.name);
+  const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
   // View modal — store ID; derive live survey so checklist updates reflect immediately
   const [viewSurveyId, setViewSurveyId] = useState<string | null>(null);
@@ -61,7 +52,7 @@ export default function SiteSurveyPage() {
 
   // New survey modal
   const [showModal, setShowModal]       = useState(false);
-  const [form, setForm]                 = useState({ project: PROJECTS[0], date: "", conductor: ENGINEERS[0], type: TYPES[0], notes: "" });
+  const [form, setForm]                 = useState({ project: "", date: "", conductor: "", type: TYPES[0], notes: "" });
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +67,8 @@ export default function SiteSurveyPage() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Standard Checklist Template
-  const [checklist, setChecklist]         = useState<ChecklistCategory[]>(initialChecklist);
+  const [checklist, setChecklist]         = useState<ChecklistCategory[]>([]);
+  const [checklistLoaded, setChecklistLoaded] = useState(false);
   const [editChecklist, setEditChecklist] = useState(false);
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
   const [newItemText, setNewItemText]     = useState<Record<string, string>>({});
@@ -94,6 +86,32 @@ export default function SiteSurveyPage() {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);
+
+  // Load surveys + checklist template from the database, then persist changes back.
+  useEffect(() => {
+    loadSurveys().then(rows => setSurveys(rows as Survey[])).catch(err => console.warn("[Survey] load failed:", err)).finally(() => setLoaded(true));
+    loadSurveyChecklist().then(setChecklist).catch(err => console.warn("[Survey] checklist load failed:", err)).finally(() => setChecklistLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    saveSurveys(surveys).catch(err => console.warn("[Survey] save failed:", err));
+  }, [surveys, loaded]);
+
+  useEffect(() => {
+    if (!checklistLoaded) return;
+    saveSurveyChecklist(checklist).catch(err => console.warn("[Survey] checklist save failed:", err));
+  }, [checklist, checklistLoaded]);
+
+  // Default the new-survey form's project/conductor to the first DB option once loaded.
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      project: prev.project || PROJECTS[0] || "",
+      conductor: prev.conductor || ENGINEERS[0] || "",
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [PROJECTS.length, ENGINEERS.length]);
 
   // Dynamic stats
   const total          = surveys.length;

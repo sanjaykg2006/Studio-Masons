@@ -1,19 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-
-const allSnags = [
-  { id: "#SN-102", project: "Indiranagar Residence", title: "Master Bedroom", priority: "HIGH PRIORITY", priorityStyle: "bg-error/10 text-error border-error/20", status: "OPEN", statusStyle: "bg-primary/10 text-primary border-primary/20", desc: "Paint peeling near AC duct in the south-west corner of the ceiling. Requires scraping and repaint.", assignee: "Eng. David K.", time: "2 DAYS AGO", closed: false, accent: true },
-  { id: "#SN-105", project: "Indiranagar Residence", title: "Living Area Balcony", priority: "MEDIUM", priorityStyle: "bg-yellow-600/10 text-yellow-600 border-yellow-600/20", status: "OPEN", statusStyle: "bg-primary/10 text-primary border-primary/20", desc: "Alignment issue with the glass railing gaskets. Visual gap of 3mm observed on the left section.", assignee: "Ar. Sarah Chen", time: "5 HOURS AGO", closed: false, accent: false },
-  { id: "#SN-098", project: "Whitefield Office", title: "Kitchen Pantry", priority: "LOW", priorityStyle: "bg-[#666666]/10 text-[#666666] border-[#666666]/20", status: "CLOSED", statusStyle: "bg-surface-container-highest text-[#666666] border-surface-container-highest", desc: "Hinges for the corner cabinet need tightening and lubrication. Slight squeak on opening.", assignee: "Eng. Rajat P.", time: "RESOLVED 1W AGO", closed: true, accent: false },
-  { id: "#SN-110", project: "Koramangala Villa", title: "Bathroom Tiles", priority: "HIGH PRIORITY", priorityStyle: "bg-error/10 text-error border-error/20", status: "OPEN", statusStyle: "bg-primary/10 text-primary border-primary/20", desc: "Cracked tile near shower drain. Water seepage risk if not replaced before waterproofing stage.", assignee: "Eng. David K.", time: "1 DAY AGO", closed: false, accent: true },
-  { id: "#SN-111", project: "HSR Layout G+3", title: "Staircase Railing", priority: "MEDIUM", priorityStyle: "bg-yellow-600/10 text-yellow-600 border-yellow-600/20", status: "OPEN", statusStyle: "bg-primary/10 text-primary border-primary/20", desc: "Railing height is 50mm below code requirement. Needs extension plates welded on top.", assignee: "Ar. Sarah Chen", time: "3 HOURS AGO", closed: false, accent: false },
-];
+import { loadSnags, type SnagDTO } from "../data";
 
 export default function SnagsPage() {
-  const { selectedProject } = useProject();
+  const { selectedProject, team } = useProject();
   const [showModal, setShowModal] = useState(false);
   const [priority, setPriority] = useState("MEDIUM");
+  const [allSnags, setAllSnags] = useState<SnagDTO[]>([]);
+
+  useEffect(() => {
+    loadSnags().then(setAllSnags).catch((err) => console.warn("[Snags] load failed:", err));
+  }, []);
 
   const snags = selectedProject
     ? allSnags.filter(s => s.project === selectedProject.name)
@@ -163,9 +161,7 @@ export default function SnagsPage() {
                 <div className="flex flex-col gap-2">
                   <label className="text-[14px] font-bold text-primary uppercase">Assign To</label>
                   <select className="bg-white border border-surface-container-highest rounded p-3 text-[16px] focus:outline-none focus:border-primary transition-all">
-                    <option>Eng. David K.</option>
-                    <option>Ar. Sarah Chen</option>
-                    <option>Eng. Rajat P.</option>
+                    {team.map(m => <option key={m.id}>{m.name}</option>)}
                   </select>
                 </div>
               </div>

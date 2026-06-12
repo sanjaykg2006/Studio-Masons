@@ -1,20 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-
-const boqItems = [
-  { name: "Internal Plastering", category: "Civil Works", status: "In Progress", statusStyle: "bg-primary/10 text-primary border-primary/20", budgeted: "₹45,000.00", installed: "₹32,400.00", pct: 72, barColor: "bg-primary" },
-  { name: "Electrical Concealing", category: "MEP", status: "In Progress", statusStyle: "bg-primary/10 text-primary border-primary/20", budgeted: "₹28,000.00", installed: "₹11,200.00", pct: 40, barColor: "bg-primary" },
-  { name: "Brick Work – Floor 4", category: "Civil Works", status: "Completed", statusStyle: "bg-green-500/10 text-green-600 border-green-500/20", budgeted: "₹62,500.00", installed: "₹62,500.00", pct: 100, barColor: "bg-green-500" },
-  { name: "Tiling – Bathrooms", category: "Finishing", status: "Delayed", statusStyle: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20", budgeted: "₹18,700.00", installed: "₹1,496.00", pct: 8, barColor: "bg-yellow-500" },
-  { name: "AC Ducting Installation", category: "HVAC", status: "Scheduled", statusStyle: "bg-surface-container-highest text-[#666666] border-surface-container-highest", budgeted: "₹84,000.00", installed: "₹0.00", pct: 0, barColor: "bg-primary" },
-];
+import { loadBoqItems, type BoqItemDTO } from "../data";
 
 const subTabs = ["BOQ Level", "Project Schedule", "DPR/WPR Reports", "Material Update"];
 
 export default function SiteProgressPage() {
   const { selectedProject } = useProject();
   const [activeTab, setActiveTab] = useState(0);
+  const [boqItems, setBoqItems] = useState<BoqItemDTO[]>([]);
+
+  useEffect(() => {
+    loadBoqItems().then(setBoqItems).catch((err) => console.warn("[SiteProgress] BOQ load failed:", err));
+  }, []);
 
   // No project selected — show prompt
   if (!selectedProject) {

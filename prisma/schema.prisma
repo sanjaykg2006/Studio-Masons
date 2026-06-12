@@ -148,6 +148,112 @@ model Order {
   payments VendorPayment[]
 }
 
+// Purchase orders issued to vendors. Kept independent of the Project table
+// (projectId is stored as a plain string, not a FK) because the ERP's projects
+// are still a client-side demo (proj_1…) and aren't persisted yet — this lets POs
+// live in the database today and stay valid once projects are migrated.
+model PurchaseOrder {
+  id                 String   @id @default(cuid())
+  projectId          String
+  projectName        String
+  vendorName         String
+  poNumber           String
+  poValue            Decimal  @db.Decimal(15, 2)
+  poFileName         String?
+  // PO-document details captured by the generator, so a PO can be re-opened and
+  // amended later with everything pre-filled.
+  projectCode        String?
+  subject            String?
+  quotationRef       String?
+  quotationDate      String?
+  vendorAddress      String?
+  vendorGstin        String?
+  commencement       String?
+  completion         String?
+  paymentTerms       String[]
+  notes              Json?
+  annexRemarks       Json?
+  // Acceptance + advance stage (filled in after the PO is issued).
+  acceptanceFileName String?
+  advanceRequested   Decimal? @db.Decimal(15, 2)
+  advanceApproved    Boolean  @default(false)
+  advanceTdsPct      Decimal? @db.Decimal(5, 2)
+  advancePayable     Decimal? @db.Decimal(15, 2)
+  advanceConsumed    Decimal  @db.Decimal(15, 2) @default(0)
+  // Fixed contract window — invoices for this vendor must fall inside it.
+  fixedContract      Boolean  @default(false)
+  contractStart      String?
+  contractEnd        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  lines PurchaseOrderLine[]
+
+  @@index([projectId])
+}
+
+// A single service / scope line on a purchase order. poValue is the sum of these.
+model PurchaseOrderLine {
+  id       String  @id @default(cuid())
+  poId     String
+  service  String
+  unit     String
+  quantity Decimal @db.Decimal(12, 2)
+  rate     Decimal @db.Decimal(15, 2)
+  amount   Decimal @db.Decimal(15, 2)
+
+  po PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+}
+
+// A vendor invoice in the orders workflow. Kept independent of the Project/Order
+// tables (project + vendor stored as plain strings) for the same reason as
+// PurchaseOrder — projects are still a client-side demo. The id is the app-generated
+// invoice number (e.g. SM-INV-4902), so it is not auto-defaulted.
+model VendorInvoice {
+  id                 String   @id
+  vendor             String
+  project            String
+  amount             String
+  amountNum          Decimal  @db.Decimal(15, 2)
+  due                String
+  status             String
+  flagged            Boolean  @default(false)
+  baseValue          Decimal? @db.Decimal(15, 2)
+  sgstPct            Decimal? @db.Decimal(5, 2)
+  cgstPct            Decimal? @db.Decimal(5, 2)
+  igstPct            Decimal? @db.Decimal(5, 2)
+  remarks            String?
+  amountPayable      Decimal? @db.Decimal(15, 2)
+  requestedAmount    Decimal? @db.Decimal(15, 2)
+  advanceDeducted    Decimal? @db.Decimal(15, 2)
+  tdsPct             Decimal? @db.Decimal(5, 2)
+  retentionHeld      Boolean  @default(false)
+  retentionAmount    Decimal? @db.Decimal(15, 2)
+  pmApprovedAt       String?
+  pmApprovedBy       String?
+  accountsApprovedBy String?
+  fileName           String?
+  createdAt          DateTime @default(now())
+}
+
+// A vendor payment request in the orders workflow. Independent of Project/Order
+// for the same reason as VendorInvoice. The id is app-generated (e.g. PR-001).
+model PaymentRequest {
+  id                 String   @id
+  vendor             String
+  project            String
+  amount             String
+  amountNum          Decimal  @db.Decimal(15, 2)
+  requested          String
+  status             String
+  notes              String?
+  invoiceRef         String?
+  priority           String?
+  accountsApprovedBy String?
+  paidBy             String?
+  createdAt          DateTime @default(now())
+}
+
 model VendorPayment {
   id          String    @id @default(cuid())
   orderId     String
@@ -278,4 +384,248 @@ model ActivityLog {
 
   project Project @relation(fields: [projectId], references: [id])
   user    User    @relation(fields: [userId], references: [id])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App-shaped, denormalized tables that back the UI directly. Project is stored as
+// a name string (not a FK) to match the client-side project selector, the same
+// pattern used by PurchaseOrder / VendorInvoice. These are the source of truth for
+// the pages — nothing in the UI is hardcoded.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// The project selector + dashboard. id keeps the legacy "proj_N" values referenced
+// by PurchaseOrder.projectId.
+model AppProject {
+  id         String  @id
+  name       String
+  clientName String
+  location   String
+  pct        Int     @default(0)
+  engineer   String
+  isDelayed  Boolean @default(false)
+  sortOrder  Int     @default(0)
+}
+
+// Team members used across assignee / engineer dropdowns and Settings.
+model TeamMember {
+  id        String  @id @default(cuid())
+  name      String
+  role      String
+  email     String?
+  phone     String?
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+// Dashboard recent-activity feed.
+model ActivityEntry {
+  id     String   @id
+  icon   String
+  color  String
+  route  String
+  text   String
+  bold   String
+  detail String
+  by     String
+  at     DateTime
+}
+
+model SnagEntry {
+  id          String   @id
+  projectName String
+  title       String
+  priority    String
+  status      String
+  description String
+  assignee    String
+  displayTime String
+  accent      Boolean  @default(false)
+  closed      Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model DesignDoc {
+  id        String  @id
+  icon      String
+  name      String
+  meta      String
+  by        String
+  date      String
+  status    String
+  feedback  String?
+  sortOrder Int     @default(0)
+}
+
+model SurveyEntry {
+  id           String   @id
+  projectName  String
+  date         String
+  conductor    String
+  status       String
+  photos       Int      @default(0)
+  type         String
+  notes        String
+  checkedItems String[]
+  sortOrder    Int      @default(0)
+}
+
+// Standard survey checklist template (categories with their item labels).
+model SurveyChecklistCategory {
+  id        String   @id @default(cuid())
+  category  String
+  items     String[]
+  sortOrder Int      @default(0)
+}
+
+model AuditEntry {
+  id        String  @id @default(cuid())
+  section   String
+  label     String
+  signed    Boolean @default(false)
+  signedBy  String?
+  date      String?
+  sortOrder Int     @default(0)
+}
+
+// Per-project audit progress cards shown alongside the checklist.
+model AuditProjectRow {
+  id         String @id @default(cuid())
+  name       String
+  completion Int    @default(0)
+  status     String
+  sortOrder  Int    @default(0)
+}
+
+model DlpTicketEntry {
+  id           String  @id
+  projectName  String
+  title        String
+  category     String
+  reportedDate String
+  dueDate      String
+  assignee     String
+  status       String
+  priority     String
+  amcDue       String?
+  sortOrder    Int     @default(0)
+}
+
+model AmcScheduleEntry {
+  id          String  @id @default(cuid())
+  service     String
+  projectName String
+  nextDue     String
+  frequency   String
+  overdue     Boolean @default(false)
+  sortOrder   Int     @default(0)
+}
+
+// Site-progress BOQ breakdown (demo set is global, not per-project).
+model BoqProgressItem {
+  id        String @id @default(cuid())
+  name      String
+  category  String
+  status    String
+  budgeted  String
+  installed String
+  pct       Int    @default(0)
+  sortOrder Int    @default(0)
+}
+
+model SiteExpenseEntry {
+  id                String   @id
+  category          String
+  description       String
+  projectName       String
+  amount            String
+  amountNum         Decimal  @db.Decimal(15, 2)
+  date              String
+  by                String
+  status            String
+  pmApprovedBy      String?
+  billingApprovedBy String?
+  accountsApprovedBy String?
+  sortOrder         Int      @default(0)
+}
+
+model VendorScopeEntry {
+  id          String  @id
+  vendor      String
+  projectName String
+  scope       String
+  progress    Int     @default(0)
+  status      String
+  dueDate     String
+  sortOrder   Int     @default(0)
+}
+
+model QualityInspection {
+  id          String  @id
+  projectName String
+  area        String
+  category    String
+  inspector   String
+  date        String
+  result      String
+  score       Int     @default(0)
+  remarks     String?
+  sortOrder   Int     @default(0)
+}
+
+// Quality checklist template — items stored as JSON [{ label, linked }].
+model QualityChecklistCategory {
+  id        String @id @default(cuid())
+  name      String
+  items     Json
+  sortOrder Int    @default(0)
+}
+
+model ErpIntegration {
+  id            String  @id
+  name          String
+  category      String
+  description   String
+  icon          String
+  iconBg        String
+  iconColor     String
+  status        String
+  lastSync      String?
+  recordsSynced Int     @default(0)
+  enabled       Boolean @default(false)
+  apiKey        String  @default("")
+  endpoint      String  @default("")
+  sortOrder     Int     @default(0)
+}
+
+model ErpSyncLog {
+  id          String @id
+  integration String
+  event       String
+  status      String
+  records     Int    @default(0)
+  timestamp   String
+  duration    String
+  sortOrder   Int    @default(0)
+}
+
+model ErpFieldMapping {
+  id            String @id @default(cuid())
+  erpField      String
+  externalField String
+  integration   String
+  type          String
+  direction     String
+  sortOrder     Int    @default(0)
+}
+
+model ErpWebhook {
+  id            String   @id
+  name          String
+  url           String
+  events        String[]
+  status        String
+  lastTriggered String
+  successRate   Int      @default(0)
+  sortOrder     Int      @default(0)
 }

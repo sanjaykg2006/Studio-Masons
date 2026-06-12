@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProject, type Invoice, type PayReq, type InvStatus, type ReqStatus } from "../../../contexts/ProjectContext";
+import { loadExpenses, saveExpenses, loadScope, saveScope } from "../data";
 
 // ── Types ─────────────────────────────────────────────────────────
 // Invoice & payment-request types now live in ProjectContext (shared + persisted).
@@ -43,22 +44,6 @@ const EXP_STYLE: Record<ExpStatus, React.CSSProperties> = {
   "Rejected":                  { background:"rgba(186,26,26,0.08)", color:"#ba1a1a", borderColor:"rgba(186,26,26,0.25)" },
 };
 
-// ── Initial data ──────────────────────────────────────────────────
-const initExpenses: Expense[] = [
-  { id:"EXP-001", category:"Materials",      description:"Cement bags – 120 units",         project:"Indiranagar Residence", amount:"₹6,000",  amountNum:6000,  date:"Nov 08, 2024", by:"Vikram R.", status:"Paid", pmApprovedBy:"Vikram R.", billingApprovedBy:"Meera D.", accountsApprovedBy:"Arjun K." },
-  { id:"EXP-002", category:"Labor",          description:"Daily labor – 12 workers × 3 days",project:"Whitefield Office",    amount:"₹7,200",  amountNum:7200,  date:"Nov 07, 2024", by:"Sneha P.", status:"Pending Accounts Approval", pmApprovedBy:"Sneha P.", billingApprovedBy:"Meera D." },
-  { id:"EXP-003", category:"Equipment",      description:"Scaffolding rental – 2 weeks",    project:"Koramangala Villa",     amount:"₹4,500",  amountNum:4500,  date:"Nov 06, 2024", by:"Amit S.", status:"Pending Billing Approval", pmApprovedBy:"Amit S." },
-  { id:"EXP-004", category:"Miscellaneous",  description:"Site permits and fees",            project:"HSR Layout G+3",        amount:"₹1,800",  amountNum:1800,  date:"Nov 05, 2024", by:"Rahul K.", status:"Pending PM Approval" },
-  { id:"EXP-005", category:"Materials",      description:"Reinforcement bars – 5 MT",       project:"Indiranagar Residence", amount:"₹18,500", amountNum:18500, date:"Nov 04, 2024", by:"Vikram R.", status:"Pending PM Approval" },
-];
-const initScope: VScope[] = [
-  { id:"VS-001", vendor:"Blackwood Stonemasons Ltd.", project:"Indiranagar Residence", scope:"Stone cladding – main facade (Ground + 2 floors)", progress:65, status:"In Progress",  dueDate:"Dec 15, 2024" },
-  { id:"VS-002", vendor:"Imperial Steel Works",       project:"Whitefield Office",     scope:"Structural steel frame – Floors 3 to 7",           progress:30, status:"In Progress",  dueDate:"Jan 10, 2025" },
-  { id:"VS-003", vendor:"Glass & Light Studios",      project:"Koramangala Villa",     scope:"Custom glazing – all openings incl. skylight",      progress:0,  status:"Not Started",  dueDate:"Feb 05, 2025" },
-  { id:"VS-004", vendor:"Oak & Grain Joinery",        project:"Indiranagar Residence", scope:"Joinery and millwork – kitchens and wardrobes",     progress:100,status:"Completed",    dueDate:"Oct 30, 2024" },
-  { id:"VS-005", vendor:"Elite Electrical Solutions", project:"HSR Layout G+3",        scope:"Electrical first fix – all floors",                 progress:20, status:"Delayed",      dueDate:"Nov 30, 2024" },
-];
-
 const TABS = ["Vendor Invoices", "Vendor Payment Requests", "Site Expense Tracking", "Vendor Scope & Progress"];
 const PAGE_SIZE = 5;
 
@@ -75,8 +60,24 @@ export default function OrdersPage() {
   const { selectedProject, getProjectVendorPOs, getVendorPO, consumeAdvance, invoices, setInvoices, requests, setRequests, logActivity } = useProject();
 
   const [activeTab, setActiveTab] = useState(0);
-  const [expenses, setExpenses]   = useState<Expense[]>(initExpenses);
-  const [scope, setScope]         = useState<VScope[]>(initScope);
+  const [expenses, setExpenses]   = useState<Expense[]>([]);
+  const [scope, setScope]         = useState<VScope[]>([]);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
+
+  // Site expenses + vendor scope load from the database and persist on change.
+  useEffect(() => {
+    loadExpenses().then(rows => setExpenses(rows as Expense[])).catch(err => console.warn("[Orders] expenses load failed:", err));
+    loadScope().then(rows => setScope(rows as VScope[])).catch(err => console.warn("[Orders] scope load failed:", err)).finally(() => setOrdersLoaded(true));
+  }, []);
+  useEffect(() => {
+    if (!ordersLoaded) return;
+    saveExpenses(expenses.map(e => ({ id: e.id, category: e.category, description: e.description, project: e.project, amount: e.amount, amountNum: e.amountNum, date: e.date, by: e.by, status: e.status, pmApprovedBy: e.pmApprovedBy, billingApprovedBy: e.billingApprovedBy, accountsApprovedBy: e.accountsApprovedBy })))
+      .catch(err => console.warn("[Orders] expenses save failed:", err));
+  }, [expenses, ordersLoaded]);
+  useEffect(() => {
+    if (!ordersLoaded) return;
+    saveScope(scope).catch(err => console.warn("[Orders] scope save failed:", err));
+  }, [scope, ordersLoaded]);
 
   // Slide-over
   const [slideInvId, setSlideInvId] = useState<string | null>(null);
@@ -466,7 +467,13 @@ export default function OrdersPage() {
       // Gate 1 — a purchase order must exist for this vendor on this project.
       const po = selectedProject ? getVendorPO(selectedProject.id, vendorName) : undefined;
       if (!vendorName || !po) {
-        setUploadError("No purchase order exists for this vendor. Add the vendor and PO on the dashboard before uploading an invoice.");
+        setUploadError("No purchase order exists for this vendor. Generate the PO on the Purchase Orders page before uploading an invoice.");
+        return;
+      }
+
+      // Gate 1b — the vendor's acceptance letter must be uploaded against the PO first.
+      if (!po.acceptanceFileName) {
+        setUploadError(`Acceptance letter not uploaded for ${vendorName}'s purchase order (${po.poNumber}). Upload the acceptance on the Purchase Orders page before raising an invoice.`);
         return;
       }
 

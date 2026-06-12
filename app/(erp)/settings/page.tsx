@@ -2,6 +2,8 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, uploadAvatar, removeAvatar, changePassword, type Profile, type TeamMember } from "./actions";
 import type { Role } from "@/app/generated/prisma";
+import { useAppearance, type SidebarStyle, type DateFormat } from "@/contexts/AppearanceContext";
+import { useToast } from "@/lib/toast";
 
 const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "Appearance"];
 
@@ -43,6 +45,15 @@ export default function SettingsPage() {
   const [erpUrl, setErpUrl] = useState("");
   const [erpKey, setErpKey] = useState("");
 
+  const appearance = useAppearance();
+  const toast = useToast();
+
+  // Local draft of the appearance settings; committed to the shared context
+  // (and localStorage) only when "Save Appearance" is clicked.
+  const [themeColor, setThemeColor] = useState(appearance.themeColor);
+  const [sidebarStyle, setSidebarStyle] = useState<SidebarStyle>(appearance.sidebarStyle);
+  const [dateFormat, setDateFormat] = useState<DateFormat>(appearance.dateFormat);
+
   const [showInvite, setShowInvite] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [inviting, startInvite] = useTransition();
@@ -72,6 +83,19 @@ export default function SettingsPage() {
       .finally(() => setMeLoaded(true));
     listTeam().then(setTeam).catch(() => setTeam([]));
   }, []);
+
+  // Once persisted appearance settings have loaded from storage, seed the draft.
+  useEffect(() => {
+    if (!appearance.loaded) return;
+    setThemeColor(appearance.themeColor);
+    setSidebarStyle(appearance.sidebarStyle);
+    setDateFormat(appearance.dateFormat);
+  }, [appearance.loaded, appearance.themeColor, appearance.sidebarStyle, appearance.dateFormat]);
+
+  function handleSaveAppearance() {
+    appearance.save({ themeColor, sidebarStyle, dateFormat });
+    toast.success("Appearance saved", "Your preferences have been applied across the app.");
+  }
 
   function handleInvite(formData: FormData) {
     setInviteMsg(null);
@@ -438,37 +462,40 @@ export default function SettingsPage() {
                 <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Colour Theme</p>
                 <div className="flex gap-4">
                   {[
-                    { name: "Studio Red", color: "#e30613", active: true },
-                    { name: "Midnight", color: "#1b1c1c", active: false },
-                    { name: "Forest", color: "#16a34a", active: false },
-                    { name: "Ocean", color: "#0059a8", active: false },
-                  ].map((t, i) => (
-                    <div key={i} style={{textAlign:"center",cursor:"pointer"}}>
-                      <div style={{width:"48px",height:"48px",borderRadius:"50%",background:t.color,margin:"0 auto 8px",border:t.active?"3px solid #e30613":"3px solid transparent",boxShadow:t.active?"0 0 0 2px rgba(227,6,19,0.3)":"none"}} />
-                      <p style={{fontSize:"11px",fontWeight:t.active?"bold":"normal",color:t.active?"#e30613":"#666666"}}>{t.name}</p>
-                    </div>
-                  ))}
+                    { name: "Studio Red", color: "#e30613" },
+                    { name: "Midnight", color: "#1b1c1c" },
+                    { name: "Forest", color: "#16a34a" },
+                    { name: "Ocean", color: "#0059a8" },
+                  ].map((t, i) => {
+                    const active = themeColor === t.color;
+                    return (
+                      <div key={i} onClick={() => setThemeColor(t.color)} style={{textAlign:"center",cursor:"pointer"}}>
+                        <div style={{width:"48px",height:"48px",borderRadius:"50%",background:t.color,margin:"0 auto 8px",border:active?"3px solid #e30613":"3px solid transparent",boxShadow:active?"0 0 0 2px rgba(227,6,19,0.3)":"none"}} />
+                        <p style={{fontSize:"11px",fontWeight:active?"bold":"normal",color:active?"#e30613":"#666666"}}>{t.name}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <div>
                 <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Sidebar Style</p>
                 <div className="flex gap-4">
-                  {["Compact", "Default", "Wide"].map((s, i) => (
-                    <button key={i} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${i===1 ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{s}</button>
+                  {(["Compact", "Default", "Wide"] as const).map((s, i) => (
+                    <button key={i} onClick={() => setSidebarStyle(s)} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${sidebarStyle===s ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{s}</button>
                   ))}
                 </div>
               </div>
               <div>
                 <p className="text-[13px] font-bold text-[#e30613] uppercase mb-4">Date Format</p>
                 <div className="flex gap-4">
-                  {["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"].map((f, i) => (
-                    <button key={i} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${i===0 ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{f}</button>
+                  {(["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"] as const).map((f, i) => (
+                    <button key={i} onClick={() => setDateFormat(f)} className={`px-5 py-2.5 rounded border text-[13px] font-bold transition-all ${dateFormat===f ? "border-[#e30613] text-[#e30613] bg-[#e30613]/5" : "border-[#e4e2e1] text-[#666666] hover:border-[#e30613]/40"}`}>{f}</button>
                   ))}
                 </div>
               </div>
             </div>
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end">
-              <button className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE APPEARANCE</button>
+              <button onClick={handleSaveAppearance} className="bg-[#e30613] text-white px-6 py-2 rounded font-bold text-[14px] hover:opacity-90 shadow-sm transition-all">SAVE APPEARANCE</button>
             </div>
           </div>
         </div>

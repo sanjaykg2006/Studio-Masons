@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
+import { loadInspections, saveInspections, loadQualityChecklist, type QualityChecklistDTO } from "../data";
 
 type Result = "Pass" | "Fail" | "Conditional" | "Draft";
 
@@ -23,39 +24,10 @@ const RESULT_STYLE: Record<Result, string> = {
   Draft:       "bg-gray-400/10 text-gray-600 border-gray-400/30",
 };
 
-const INSPECTIONS_KEY = "erp-inspections";
-
-const initInspections: Inspection[] = [
-  { id: "QC-041", project: "Indiranagar Residence", area: "Master Bedroom", category: "Finishing",   inspector: "Vikram R.", date: "Nov 14, 2024", result: "Pass",        score: 94, remarks: "" },
-  { id: "QC-040", project: "Whitefield Office",     area: "Reception Lobby", category: "Civil Works", inspector: "Sneha P.",  date: "Nov 13, 2024", result: "Fail",        score: 61, remarks: "Honeycombing observed on lobby column — rework required." },
-  { id: "QC-039", project: "Koramangala Villa",     area: "Kitchen",        category: "MEP",          inspector: "Amit S.",   date: "Nov 12, 2024", result: "Pass",        score: 88, remarks: "" },
-  { id: "QC-038", project: "HSR Layout G+3",        area: "Staircase",      category: "Civil Works",  inspector: "Rahul K.",  date: "Nov 11, 2024", result: "Conditional", score: 74, remarks: "Minor alignment deviation — acceptable with touch-up." },
-  { id: "QC-037", project: "Indiranagar Residence", area: "Bathrooms",      category: "Plumbing",     inspector: "Vikram R.", date: "Nov 10, 2024", result: "Pass",        score: 91, remarks: "" },
-];
-
-// Checklist segregated into Precheck, Postcheck and a line-item-wise checklist.
-const checklistCategories = [
-  { name: "Precheck", items: [
-    { label: "Site safety clearance", linked: false },
-    { label: "Material check", linked: false },
-    { label: "Drawings verified", linked: false },
-    { label: "Base surface preparation", linked: true },
-  ]},
-  { name: "Postcheck", items: [
-    { label: "Cleanliness & debris removal", linked: false },
-    { label: "Curing duration verified", linked: false },
-    { label: "Protection of finished surfaces", linked: false },
-    { label: "Defects logged", linked: true },
-  ]},
-  { name: "Line Item Wise Checklist", items: [
-    { label: "Level and alignment tolerance", linked: false },
-    { label: "Gaps & joint filling", linked: false },
-    { label: "Operation of fixtures", linked: false },
-    { label: "Leakage/pressure testing", linked: true },
-  ]},
-];
-
-const freshChecklist = () => checklistCategories.map(c => ({ ...c, items: c.items.map(i => ({ ...i, checked: false })) }));
+// The checklist template is loaded from the database; freshChecklist resets the
+// "checked" flags for a new inspection.
+const freshChecklist = (template: QualityChecklistDTO[]) =>
+  template.map(c => ({ name: c.name, items: c.items.map(i => ({ ...i, checked: false })) }));
 
 function nextId(list: Inspection[]) {
   const max = list.reduce((m, c) => {
@@ -72,11 +44,12 @@ function resultFromScore(score: number): Result {
 export default function QualityPage() {
   const { projects } = useProject();
 
-  const [inspections, setInspections] = useState<Inspection[]>(initInspections);
+  const [inspections, setInspections] = useState<Inspection[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [template, setTemplate] = useState<QualityChecklistDTO[]>([]);
 
   // Live checklist (right panel) + the inspection currently being conducted.
-  const [checks2, setChecks2] = useState(freshChecklist());
+  const [checks2, setChecks2] = useState<ReturnType<typeof freshChecklist>>([]);
   const [active, setActive] = useState<{ project: string; area: string; category: string; inspector: string; remarks: string } | null>(null);
 
   // New inspection modal
@@ -88,24 +61,16 @@ export default function QualityPage() {
   const [editResult, setEditResult] = useState<Result>("Pass");
   const [editRemarks, setEditRemarks] = useState("");
 
-  // Hydrate from localStorage.
+  // Load inspections + checklist template from the database, then persist changes.
   useEffect(() => {
-    const stored = localStorage.getItem(INSPECTIONS_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as Inspection[];
-        if (Array.isArray(parsed)) setInspections(parsed);
-      } catch { /* ignore malformed storage */ }
-    }
-    setHydrated(true);
+    loadInspections().then(rows => setInspections(rows as Inspection[])).catch(err => console.warn("[Quality] load failed:", err)).finally(() => setHydrated(true));
+    loadQualityChecklist().then(t => { setTemplate(t); setChecks2(freshChecklist(t)); }).catch(err => console.warn("[Quality] checklist load failed:", err));
   }, []);
 
-  // Persist.
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      localStorage.setItem(INSPECTIONS_KEY, JSON.stringify(inspections));
-    } catch { /* best effort */ }
+    saveInspections(inspections.map(i => ({ id: i.id, project: i.project, area: i.area, category: i.category, inspector: i.inspector, date: i.date, result: i.result, score: i.score, remarks: i.remarks ?? "" })))
+      .catch(err => console.warn("[Quality] save failed:", err));
   }, [inspections, hydrated]);
 
   const toggle = (ci: number, ii: number) => {
@@ -128,7 +93,7 @@ export default function QualityPage() {
 
   function startInspection() {
     setActive({ ...newForm, project: newForm.project || projects[0]?.name || "" });
-    setChecks2(freshChecklist());
+    setChecks2(freshChecklist(template));
     setShowNew(false);
   }
 
@@ -149,7 +114,7 @@ export default function QualityPage() {
     };
     setInspections(prev => [insp, ...prev]);
     setActive(null);
-    setChecks2(freshChecklist());
+    setChecks2(freshChecklist(template));
   }
 
   function openEdit(insp: Inspection) {

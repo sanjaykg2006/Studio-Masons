@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProject } from "../../../contexts/ProjectContext";
+import { loadDesignDocs, saveDesignDocs } from "../data";
 
 type FileStatus = "Pending Review" | "Approved" | "Changes Needed";
 
@@ -22,17 +23,6 @@ const STATUS_INLINE: Record<FileStatus, React.CSSProperties> = {
   "Approved":        { background: "rgba(34,197,94,0.08)", color: "#16a34a", borderColor: "rgba(34,197,94,0.2)" },
   "Changes Needed":  { background: "rgba(186,26,26,0.08)", color: "#ba1a1a", borderColor: "rgba(186,26,26,0.2)" },
 };
-
-const initialFiles: DesignFile[] = [
-  { id: "f1", icon: "architecture",  name: "Master_Plan_V3.pdf",            meta: "Architectural Set • 24.5 MB",   by: "Marcus Sterling",  date: "Oct 24, 2023", status: "Pending Review",  feedback: "" },
-  { id: "f2", icon: "texture",       name: "Material_Specs_Final.rvt",       meta: "Revit Model • 142.1 MB",       by: "Elena Rossi",      date: "Oct 22, 2023", status: "Approved" },
-  { id: "f3", icon: "imagesmode",    name: "Kitchen_Lighting_Mockups.zip",   meta: "Asset Bundle • 89.4 MB",       by: "Marcus Sterling",  date: "Oct 20, 2023", status: "Changes Needed",  feedback: "Lighting temperature does not match spec. Please revise warm-white fixtures on island and peninsula. Reference colour chip #WW3200K." },
-  { id: "f4", icon: "description",   name: "Structural_Analysis_B.pdf",      meta: "Engineering Report • 5.1 MB",  by: "Dr. Sarah Laine",  date: "Oct 19, 2023", status: "Approved" },
-  { id: "f5", icon: "crop_landscape",name: "Elevation_South_V2.dwg",         meta: "CAD Drawing • 8.7 MB",         by: "Elena Rossi",      date: "Oct 17, 2023", status: "Pending Review",  feedback: "" },
-  { id: "f6", icon: "bolt",          name: "Electrical_Layout_Floor1.pdf",   meta: "Engineering Drawing • 3.2 MB", by: "Dr. Sarah Laine",  date: "Oct 15, 2023", status: "Approved" },
-  { id: "f7", icon: "air",           name: "HVAC_Schematic_R1.pdf",          meta: "MEP Drawing • 6.9 MB",         by: "Marcus Sterling",  date: "Oct 13, 2023", status: "Changes Needed",  feedback: "Duct routing conflicts with beam on Grid Line C. Coordinate with structural engineer before resubmission." },
-  { id: "f8", icon: "map",           name: "Site_Plan_Final.pdf",            meta: "Site Layout • 12.3 MB",        by: "Elena Rossi",      date: "Oct 11, 2023", status: "Approved" },
-];
 
 const PAGE_SIZE = 4;
 
@@ -85,7 +75,8 @@ function ReviewPanel({ status, feedback, dirty, onStatusChange, onFeedbackChange
 export default function DesignPage() {
   const { selectedProject } = useProject();
 
-  const [files, setFiles]           = useState<DesignFile[]>(initialFiles);
+  const [files, setFiles]           = useState<DesignFile[]>([]);
+  const [loaded, setLoaded]         = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("All");
   const [showFilter, setShowFilter] = useState(false);
   const [viewMode, setViewMode]     = useState<"table" | "grid">("table");
@@ -140,6 +131,21 @@ export default function DesignPage() {
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);
+
+  // Load design docs from the database, then persist any change back (the uploaded
+  // File can't be stored, so only its metadata round-trips — same as elsewhere).
+  useEffect(() => {
+    loadDesignDocs()
+      .then(rows => setFiles(rows as DesignFile[]))
+      .catch(err => console.warn("[Design] load failed:", err))
+      .finally(() => setLoaded(true));
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    saveDesignDocs(files.map(f => ({ id: f.id, icon: f.icon, name: f.name, meta: f.meta, by: f.by, date: f.date, status: f.status, feedback: f.feedback ?? "" })))
+      .catch(err => console.warn("[Design] save failed:", err));
+  }, [files, loaded]);
 
   // Filtered + paginated
   const filtered = filterStatus === "All" ? files : files.filter(f => f.status === filterStatus);

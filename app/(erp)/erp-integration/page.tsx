@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { loadIntegrations, loadSyncLogs, loadFieldMappings, loadWebhooks } from "../data";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,85 +48,6 @@ interface Webhook {
   successRate: number;
 }
 
-// ─── Demo Data ────────────────────────────────────────────────────────────────
-
-const initialIntegrations: Integration[] = [
-  {
-    id: "tally", name: "Tally Prime", category: "Accounting",
-    desc: "Sync purchase orders, vendor invoices, and ledger entries with Tally.",
-    icon: "account_balance", iconBg: "#1b1c1c", iconColor: "#ffffff",
-    status: "connected", lastSync: "Today, 09:14 AM", recordsSynced: 1284,
-    enabled: true, apiKey: "TP-••••••••3f2a", endpoint: "https://tally.studiomasons.in/api",
-  },
-  {
-    id: "zoho", name: "Zoho CRM", category: "Client Management",
-    desc: "Push project milestones and pull client details from Zoho CRM.",
-    icon: "contacts", iconBg: "#e30613", iconColor: "#ffffff",
-    status: "connected", lastSync: "Today, 07:30 AM", recordsSynced: 342,
-    enabled: true, apiKey: "ZC-••••••••9d7b", endpoint: "https://crm.zoho.in/api/v2",
-  },
-  {
-    id: "razorpay", name: "Razorpay", category: "Payments",
-    desc: "Reconcile payment receipts and vendor disbursements automatically.",
-    icon: "payments", iconBg: "#0059a8", iconColor: "#ffffff",
-    status: "error", lastSync: "Yesterday, 11:45 PM", recordsSynced: 89,
-    enabled: true, apiKey: "RZP-••••••••a1c4", endpoint: "https://api.razorpay.com/v1",
-  },
-  {
-    id: "gdrive", name: "Google Drive", category: "Documents",
-    desc: "Auto-upload approved design files and site images to Drive folders.",
-    icon: "folder_shared", iconBg: "#16a34a", iconColor: "#ffffff",
-    status: "connected", lastSync: "Today, 10:02 AM", recordsSynced: 2031,
-    enabled: true, apiKey: "GD-••••••••b8f1", endpoint: "https://www.googleapis.com/drive/v3",
-  },
-  {
-    id: "whatsapp", name: "WhatsApp Business", category: "Communication",
-    desc: "Send snag alerts, approval requests, and DPR summaries via WhatsApp.",
-    icon: "chat", iconBg: "#25D366", iconColor: "#ffffff",
-    status: "disconnected", lastSync: null, recordsSynced: 0,
-    enabled: false, apiKey: "", endpoint: "",
-  },
-  {
-    id: "bim360", name: "Autodesk BIM 360", category: "Design",
-    desc: "Sync RVT models and CAD drawings bi-directionally with BIM 360.",
-    icon: "architecture", iconBg: "#e87722", iconColor: "#ffffff",
-    status: "disconnected", lastSync: null, recordsSynced: 0,
-    enabled: false, apiKey: "", endpoint: "",
-  },
-];
-
-const syncLogs: SyncLog[] = [
-  { id: "L001", integration: "Tally Prime",        event: "Invoice batch pushed (12 records)",       status: "success", records: 12,  timestamp: "Today, 09:14 AM",       duration: "1.2s" },
-  { id: "L002", integration: "Google Drive",       event: "Design files uploaded (7 files)",         status: "success", records: 7,   timestamp: "Today, 10:02 AM",       duration: "4.8s" },
-  { id: "L003", integration: "Razorpay",           event: "Payment reconciliation failed",           status: "failed",  records: 0,   timestamp: "Yesterday, 11:45 PM",   duration: "—" },
-  { id: "L004", integration: "Zoho CRM",           event: "Client records pulled (5 updates)",       status: "success", records: 5,   timestamp: "Today, 07:30 AM",       duration: "0.9s" },
-  { id: "L005", integration: "Tally Prime",        event: "PO sync — 2 items skipped (duplicate)",  status: "warning", records: 18,  timestamp: "Yesterday, 06:00 PM",   duration: "2.1s" },
-  { id: "L006", integration: "Google Drive",       event: "Site images synced",                      status: "success", records: 23,  timestamp: "Yesterday, 03:15 PM",   duration: "6.2s" },
-  { id: "L007", integration: "Zoho CRM",           event: "Milestone update pushed",                 status: "success", records: 3,   timestamp: "Yesterday, 12:00 PM",   duration: "0.5s" },
-  { id: "L008", integration: "Razorpay",           event: "Webhook signature mismatch — retry 1/3", status: "failed",  records: 0,   timestamp: "Yesterday, 11:44 PM",   duration: "—" },
-];
-
-const fieldMappings: FieldMap[] = [
-  { erp_field: "Invoice ID",       external_field: "invoice_number",     integration: "Tally Prime",  type: "String",  direction: "push" },
-  { erp_field: "Vendor Name",      external_field: "party_name",         integration: "Tally Prime",  type: "String",  direction: "push" },
-  { erp_field: "Invoice Amount",   external_field: "amount",             integration: "Tally Prime",  type: "Number",  direction: "push" },
-  { erp_field: "Due Date",         external_field: "due_date",           integration: "Tally Prime",  type: "Date",    direction: "push" },
-  { erp_field: "Client Name",      external_field: "Account_Name",       integration: "Zoho CRM",     type: "String",  direction: "both" },
-  { erp_field: "Project Status",   external_field: "Deal_Stage",         integration: "Zoho CRM",     type: "Enum",    direction: "push" },
-  { erp_field: "Project Budget",   external_field: "Amount",             integration: "Zoho CRM",     type: "Number",  direction: "pull" },
-  { erp_field: "Payment Receipt",  external_field: "payment_id",         integration: "Razorpay",     type: "String",  direction: "pull" },
-  { erp_field: "Payment Amount",   external_field: "amount",             integration: "Razorpay",     type: "Number",  direction: "pull" },
-  { erp_field: "Design File URL",  external_field: "webViewLink",        integration: "Google Drive",  type: "URL",     direction: "pull" },
-];
-
-const webhooks: Webhook[] = [
-  { id: "WH001", name: "Invoice Approved",    url: "https://hooks.studiomasons.in/invoice-approved",  events: ["invoice.approved", "invoice.paid"],          status: "active",   lastTriggered: "Today, 09:14 AM",     successRate: 100 },
-  { id: "WH002", name: "Snag Raised",         url: "https://hooks.studiomasons.in/snag-created",      events: ["snag.created", "snag.updated"],               status: "active",   lastTriggered: "Yesterday, 04:30 PM", successRate: 97  },
-  { id: "WH003", name: "Design Approved",     url: "https://hooks.studiomasons.in/design-approval",   events: ["design.approved"],                            status: "active",   lastTriggered: "2 days ago",          successRate: 100 },
-  { id: "WH004", name: "Payment Received",    url: "https://hooks.razorpay.com/studiomasons",         events: ["payment.captured", "payment.failed"],         status: "failing",  lastTriggered: "Yesterday, 11:44 PM", successRate: 43  },
-  { id: "WH005", name: "BOQ Milestone",       url: "https://hooks.studiomasons.in/boq-milestone",     events: ["boq.milestone_reached"],                      status: "inactive", lastTriggered: "Never",               successRate: 0   },
-];
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const statusStyle: Record<string, { bg: string; text: string; border: string; dot: string; label: string }> = {
@@ -157,12 +79,21 @@ const directionLabel: Record<string, { icon: string; text: string }> = {
 
 export default function ERPIntegrationPage() {
   const [activeTab, setActiveTab] = useState(0);
-  const [integrations, setIntegrations] = useState<Integration[]>(initialIntegrations);
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState<string | null>(null);
   const [configDraft, setConfigDraft] = useState<{ apiKey: string; endpoint: string }>({ apiKey: "", endpoint: "" });
-  const [logs, setLogs] = useState<SyncLog[]>(syncLogs);
-  const [webhookList, setWebhookList] = useState<Webhook[]>(webhooks);
+  const [logs, setLogs] = useState<SyncLog[]>([]);
+  const [webhookList, setWebhookList] = useState<Webhook[]>([]);
+  const [fieldMappings, setFieldMappings] = useState<FieldMap[]>([]);
+
+  // All ERP integration data is loaded from the database.
+  useEffect(() => {
+    loadIntegrations().then(rows => setIntegrations(rows as Integration[])).catch(err => console.warn("[ERP] integrations load failed:", err));
+    loadSyncLogs().then(rows => setLogs(rows as SyncLog[])).catch(err => console.warn("[ERP] logs load failed:", err));
+    loadFieldMappings().then(rows => setFieldMappings(rows as FieldMap[])).catch(err => console.warn("[ERP] mappings load failed:", err));
+    loadWebhooks().then(rows => setWebhookList(rows as Webhook[])).catch(err => console.warn("[ERP] webhooks load failed:", err));
+  }, []);
   const [newWebhookOpen, setNewWebhookOpen] = useState(false);
   const [newWebhookUrl, setNewWebhookUrl] = useState("");
   const [newWebhookName, setNewWebhookName] = useState("");

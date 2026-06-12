@@ -92,6 +92,19 @@ body {
   color: #333333;
 }
 
+/* Runtime accent. AppearanceContext sets --accent on <html>; these rules remap
+   the literal #e30613 utility classes used throughout the app so a saved theme
+   colour applies globally. Solid accents follow; opacity-tinted variants
+   (e.g. bg-[#e30613]/10) intentionally stay subtle and are left as-is. */
+:root {
+  --accent: #e30613;
+}
+.text-\[\#e30613\] { color: var(--accent); }
+.bg-\[\#e30613\] { background-color: var(--accent); }
+.border-\[\#e30613\] { border-color: var(--accent); }
+.border-l-\[\#e30613\] { border-left-color: var(--accent); }
+.ring-\[\#e30613\] { --tw-ring-color: var(--accent); }
+
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
   font-family: 'Material Symbols Outlined';

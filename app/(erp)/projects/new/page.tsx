@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-const engineers = ["Vikram R.", "Sneha P.", "Amit S.", "Rahul K.", "Priya M."];
+import { useProject } from "../../../../contexts/ProjectContext";
+import { createProject } from "../../data";
 
 export default function NewProjectPage() {
   const router = useRouter();
+  const { team } = useProject();
+  const engineers = team.map(m => m.name);
   const [form, setForm] = useState({ name: "", clientName: "", location: "", engineer: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
 
@@ -13,10 +15,16 @@ export default function NewProjectPage() {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitted(true);
-    setTimeout(() => router.push("/dashboard"), 1800);
+    try {
+      await createProject({ name: form.name.trim(), clientName: form.clientName.trim(), location: form.location.trim(), engineer: form.engineer });
+    } catch (err) {
+      console.warn("[NewProject] create failed:", err);
+    }
+    // Hard navigation so the ProjectContext reloads projects (incl. the new one) from the DB.
+    setTimeout(() => { window.location.href = "/dashboard"; }, 1200);
   }
 
   const isValid = form.name.trim() && form.clientName.trim() && form.location.trim() && form.engineer;

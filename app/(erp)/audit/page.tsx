@@ -1,63 +1,27 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
+import { loadAudit, loadAuditProjects, saveAudit, type AuditSectionDTO, type AuditProjectDTO } from "../data";
 
-interface AuditItem {
-  label: string;
-  signed: boolean;
-  signedBy: string | null;
-  date: string | null;
-}
-
-interface AuditSection {
-  section: string;
-  items: AuditItem[];
-}
-
-const initialAuditItems: AuditSection[] = [
-  { section: "Structural & Civil", items: [
-    { label: "Final structural inspection sign-off", signed: true, signedBy: "Vikram R.", date: "Nov 10, 2024" },
-    { label: "Waterproofing test completed", signed: true, signedBy: "Amit S.", date: "Nov 09, 2024" },
-    { label: "Slab & column compliance verified", signed: false, signedBy: null, date: null },
-    { label: "Roof drainage functional test", signed: false, signedBy: null, date: null },
-  ]},
-  { section: "MEP Commissioning", items: [
-    { label: "Electrical load test passed", signed: true, signedBy: "Rahul K.", date: "Nov 11, 2024" },
-    { label: "Plumbing pressure test signed", signed: true, signedBy: "Sneha P.", date: "Nov 11, 2024" },
-    { label: "HVAC balancing report approved", signed: false, signedBy: null, date: null },
-    { label: "Fire suppression system checked", signed: false, signedBy: null, date: null },
-  ]},
-  { section: "Finishing & Handover", items: [
-    { label: "Snag list cleared (zero open snags)", signed: false, signedBy: null, date: null },
-    { label: "Client walkthrough conducted", signed: false, signedBy: null, date: null },
-    { label: "Measurement book submitted", signed: true, signedBy: "Vikram R.", date: "Nov 12, 2024" },
-    { label: "As-built drawings handed over", signed: false, signedBy: null, date: null },
-  ]},
-  { section: "Documentation", items: [
-    { label: "Warranty documents compiled", signed: false, signedBy: null, date: null },
-    { label: "Vendor invoices reconciled", signed: true, signedBy: "Sneha P.", date: "Nov 13, 2024" },
-    { label: "BOQ vs actual cost statement", signed: false, signedBy: null, date: null },
-    { label: "Project closeout report", signed: false, signedBy: null, date: null },
-  ]},
-];
-
-const auditProjects = [
-  { name: "Indiranagar Residence", completion: 78, status: "In Audit" },
-  { name: "Koramangala Villa", completion: 95, status: "Near Complete" },
-  { name: "Whitefield Office", completion: 42, status: "Early Stage" },
-];
+type AuditSection = AuditSectionDTO;
 
 export default function AuditPage() {
   const { selectedProject } = useProject();
   const [selected, setSelected] = useState(0);
-  const [items, setItems] = useState<AuditSection[]>(initialAuditItems);
+  const [items, setItems] = useState<AuditSection[]>([]);
+  const [auditProjects, setAuditProjects] = useState<AuditProjectDTO[]>([]);
+
+  useEffect(() => {
+    loadAudit().then(setItems).catch((err) => console.warn("[Audit] load failed:", err));
+    loadAuditProjects().then(setAuditProjects).catch((err) => console.warn("[Audit] projects load failed:", err));
+  }, []);
 
   const toggleSign = (si: number, ii: number) => {
-    setItems(prev =>
-      prev.map((sec, sIdx): AuditSection =>
+    setItems(prev => {
+      const next = prev.map((sec, sIdx): AuditSection =>
         sIdx !== si ? sec : {
           ...sec,
-          items: sec.items.map((item, iIdx): AuditItem =>
+          items: sec.items.map((item, iIdx) =>
             iIdx !== ii ? item : {
               ...item,
               signed: !item.signed,
@@ -68,13 +32,15 @@ export default function AuditPage() {
             }
           ),
         }
-      )
-    );
+      );
+      saveAudit(next).catch((err) => console.warn("[Audit] save failed:", err));
+      return next;
+    });
   };
 
   const totalItems = items.flatMap(s => s.items).length;
   const signedItems = items.flatMap(s => s.items).filter(i => i.signed).length;
-  const pct = Math.round((signedItems / totalItems) * 100);
+  const pct = totalItems ? Math.round((signedItems / totalItems) * 100) : 0;
 
   if (!selectedProject) {
     return (
@@ -145,7 +111,7 @@ export default function AuditPage() {
         <div className="lg:col-span-3 border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
             <div>
-              <h3 className="text-[20px] font-medium text-[#333333]">{auditProjects[selected].name} — Handover Checklist</h3>
+              <h3 className="text-[20px] font-medium text-[#333333]">{auditProjects[selected]?.name ?? "Handover"} — Handover Checklist</h3>
               <p className="text-[#666666] text-[13px] mt-1">{signedItems} of {totalItems} items signed off</p>
             </div>
             <div style={{ textAlign: "center" }}>
