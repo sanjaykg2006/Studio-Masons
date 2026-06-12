@@ -160,7 +160,6 @@ export async function generatePoPdf(d: PoDocData) {
   };
   metaLine("Date: ", fmtDate(d.date));
   metaLine("PO Number: ", d.poNumber);
-  metaLine("PROJECT CODE : ", d.projectCode || "—");
 
   // ── To / Billing two-column block ────────────────────────
   ty += 6;

@@ -203,6 +203,17 @@ export async function savePurchaseOrder(input: SavePOInput): Promise<PORecord> {
   return toRecord(created);
 }
 
+// Deletes a purchase order (its line items cascade away) for a project + vendor.
+// No-op if there's no matching PO.
+export async function deletePurchaseOrder(input: {
+  projectId: string;
+  vendorName: string;
+}): Promise<void> {
+  const po = await findPO(input.projectId, input.vendorName);
+  if (!po) return;
+  await prisma.purchaseOrder.delete({ where: { id: po.id } });
+}
+
 // Acceptance stage — record the acceptance document and the requested advance.
 export async function acceptPurchaseOrder(input: {
   projectId: string;

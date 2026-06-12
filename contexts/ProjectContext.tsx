@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode, type Di
 import {
   loadPurchaseOrders,
   savePurchaseOrder,
+  deletePurchaseOrder,
   acceptPurchaseOrder,
   approvePOAdvance,
   consumePOAdvance,
@@ -141,6 +142,7 @@ interface ProjectContextValue {
   // Vendor / purchase-order store
   vendorPOs: VendorPO[];
   addVendorPO: (input: AddVendorPOInput) => void;
+  removeVendorPO: (input: { projectId: string; vendorName: string }) => void;
   acceptVendorPO: (input: { projectId: string; vendorName: string; acceptanceFileName: string; advanceRequested: number }) => void;
   approveAdvance: (input: { projectId: string; vendorName: string; tdsPct: number }) => void;
   consumeAdvance: (input: { projectId: string; vendorName: string; amount: number }) => void;
@@ -371,6 +373,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     logActivity({ icon: "add_business", color: "#e30613", route: "/dashboard", text: "Vendor procured for", bold: name, detail: `${input.vendorName.trim()} added to ${name} with purchase order ${input.poNumber.trim()} of ₹${input.poValue.toLocaleString("en-IN")}.` });
   }
 
+  // Removes a vendor's purchase order from a project (optimistic), then deletes it
+  // from the database. The line items cascade away with the PO.
+  function removeVendorPO(input: { projectId: string; vendorName: string }) {
+    const name = projects.find(p => p.id === input.projectId)?.name ?? "the project";
+    const vendor = input.vendorName.trim();
+    setVendorPOs(prev => prev.filter(po =>
+      !(po.projectId === input.projectId && po.vendorName.toLowerCase() === vendor.toLowerCase())
+    ));
+    deletePurchaseOrder({ projectId: input.projectId, vendorName: input.vendorName })
+      .catch((err) => console.warn("[ProjectContext] Couldn't delete purchase order:", err));
+    logActivity({ icon: "delete", color: "#ba1a1a", route: "/purchase-orders", text: "Purchase order deleted for", bold: name, detail: `Purchase order for ${vendor} was removed from ${name}.` });
+  }
+
   // Acceptance stage — record the document and the requested advance. The advance stays
   // pending until accounts approves it (see approveAdvance).
   function acceptVendorPO(input: { projectId: string; vendorName: string; acceptanceFileName: string; advanceRequested: number }) {
@@ -409,7 +424,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   return (
     <ProjectContext.Provider
-      value={{ projects, selectedProject, setSelectedProjectId: setSelectedId, updateProjectPct, team, vendorPOs, addVendorPO, acceptVendorPO, approveAdvance, consumeAdvance, getProjectVendorPOs, getVendorPO, invoices, setInvoices, requests, setRequests, activities, logActivity }}
+      value={{ projects, selectedProject, setSelectedProjectId: setSelectedId, updateProjectPct, team, vendorPOs, addVendorPO, removeVendorPO, acceptVendorPO, approveAdvance, consumeAdvance, getProjectVendorPOs, getVendorPO, invoices, setInvoices, requests, setRequests, activities, logActivity }}
     >
       {children}
     </ProjectContext.Provider>

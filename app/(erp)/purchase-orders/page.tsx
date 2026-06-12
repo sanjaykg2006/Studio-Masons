@@ -20,7 +20,7 @@ function ReqLabel({ children }: { children: ReactNode }) {
 }
 
 export default function PurchaseOrdersPage() {
-  const { selectedProject, vendorPOs, addVendorPO, acceptVendorPO, approveAdvance } = useProject();
+  const { selectedProject, vendorPOs, addVendorPO, removeVendorPO, acceptVendorPO, approveAdvance } = useProject();
   const toast = useToast();
 
   // When set, the form is amending an existing PO rather than creating a new one.
@@ -47,7 +47,6 @@ export default function PurchaseOrdersPage() {
   // Extra details that appear on the generated PO document (not persisted — they
   // shape the PDF only). Defaults match the Studio Masons template.
   const [showDetails, setShowDetails] = useState(false);
-  const [projectCode, setProjectCode] = useState("");
   const [subject, setSubject] = useState("");
   const [quotationRef, setQuotationRef] = useState("");
   const [quotationDate, setQuotationDate] = useState("");
@@ -103,7 +102,7 @@ export default function PurchaseOrdersPage() {
     setVendorName(""); setPoNumber("");
     setFixedContract(false); setContractStart(""); setContractEnd("");
     setLines([{ ...emptyLine }]);
-    setProjectCode(""); setSubject(""); setQuotationRef(""); setQuotationDate("");
+    setSubject(""); setQuotationRef(""); setQuotationDate("");
     setVendorAddress(""); setVendorGstin(""); setCommencement(""); setCompletion("");
     setNotes({ ...DEFAULT_NOTES });
     setPaymentTerms(DEFAULT_PAYMENT_TERMS.join("\n"));
@@ -118,7 +117,6 @@ export default function PurchaseOrdersPage() {
     setAmendingId(po.id);
     setVendorName(po.vendorName);
     setPoNumber(po.poNumber);
-    setProjectCode(po.projectCode ?? "");
     setSubject(po.subject ?? "");
     setQuotationRef(po.quotationRef ?? "");
     setQuotationDate(po.quotationDate ?? "");
@@ -138,6 +136,14 @@ export default function PurchaseOrdersPage() {
     setSealDataUrl(null); setSealName(""); setAnnexureFile(null);
     setShowDetails(true); setShowNotes(true); setShowRemarks(true);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Delete an existing PO (with confirmation). Clears the form if it was being amended.
+  function handleDeletePO(po: VendorPO) {
+    if (!confirm(`Delete the purchase order for ${po.vendorName}? This removes the PO and its line items and cannot be undone.`)) return;
+    removeVendorPO({ projectId: po.projectId, vendorName: po.vendorName });
+    if (amendingId === po.id) resetForm();
+    toast.success("Purchase order deleted", `${po.vendorName} — ${po.poNumber} removed from ${po.projectName ?? selectedProject?.name ?? "the project"}.`);
   }
 
   // Acceptance — record the document + requested advance against a PO.
@@ -178,7 +184,6 @@ export default function PurchaseOrdersPage() {
     const need = (v: string, label: string) => { if (!v.trim()) missing.push(label); };
     need(vendorName, "Vendor");
     need(poNumber, "PO Number");
-    need(projectCode, "Project code");
     need(subject, "Subject");
     need(quotationRef, "Quotation reference");
     need(quotationDate, "Quotation date");
@@ -210,7 +215,6 @@ export default function PurchaseOrdersPage() {
       poNumber: trimmedPo,
       poValue,
       poFileName: `${trimmedPo}_${trimmedVendor}.pdf`,
-      projectCode: projectCode.trim(),
       subject: subject.trim(),
       quotationRef: quotationRef.trim(),
       quotationDate,
@@ -232,7 +236,6 @@ export default function PurchaseOrdersPage() {
       poNumber: trimmedPo,
       date: new Date().toISOString().slice(0, 10),
       projectName: selectedProject.name,
-      projectCode: projectCode.trim(),
       clientName: selectedProject.clientName,
       location: selectedProject.location,
       vendorName: trimmedVendor,
@@ -348,15 +351,11 @@ export default function PurchaseOrdersPage() {
           {/* PO document details (collapsible) */}
           <button type="button" onClick={() => setShowDetails((s) => !s)} style={sectionToggle}>
             <span className="material-symbols-outlined" style={chevron(showDetails)}>chevron_right</span>
-            PO document details {showDetails ? "" : "(project code, vendor address, GSTIN, dates, seal)"}
+            PO document details {showDetails ? "" : "(vendor address, GSTIN, dates, seal)"}
           </button>
 
           {showDetails && (
             <div style={sectionBox}>
-              <div>
-                <ReqLabel>Project code</ReqLabel>
-                <input value={projectCode} onChange={(e) => setProjectCode(e.target.value)} placeholder="SMPL/2025-26/KA/017" style={inputStyle} />
-              </div>
               <div>
                 <ReqLabel>Subject</ReqLabel>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={`Purchase order for ${selectedProject.name}`} style={inputStyle} />
@@ -588,6 +587,11 @@ export default function PurchaseOrdersPage() {
                       style={poActionStyle("#666666")}>
                       <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>edit_note</span>
                       Amend PO
+                    </button>
+                    <button type="button" onClick={() => handleDeletePO(po)}
+                      style={poActionStyle("#ba1a1a")}>
+                      <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>delete</span>
+                      Delete
                     </button>
                     {!po.acceptanceFileName && (
                       <button type="button" onClick={() => { setAcceptanceId(po.id); setAcceptFile(null); setAcceptAdvance(""); }}
