@@ -17,12 +17,24 @@ const statusColor: Record<string, string> = {
   "Completed":   "bg-green-500/10 text-green-600 border-green-500/20",
 };
 
-const demoNotifications = [
-  { icon: "verified",               color: "#e30613", title: "Design approved",        sub: "Indiranagar Residence", time: "2h ago",    read: false, route: "/design" },
-  { icon: "priority_high",          color: "#ba1a1a", title: "New snag raised",        sub: "Whitefield Office",     time: "4h ago",    read: false, route: "/snags" },
-  { icon: "account_balance_wallet", color: "#e30613", title: "Invoice ₹1.2L pending",  sub: "Koramangala Villa",     time: "Yesterday", read: true,  route: "/orders" },
-  { icon: "chat_bubble",            color: "#666666", title: "Architect comment added", sub: "HSR Layout G+3",        time: "Yesterday", read: true,  route: "/design" },
-];
+// Relative "time ago" label for notification timestamps (mirrors the dashboard feed).
+function timeAgo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 60) return "Just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// localStorage key for which notification (activity) ids the user has read.
+const NOTIF_READ_KEY = "erp-notif-read";
 
 const accountItems = [
   { icon: "manage_accounts", label: "Profile & Settings", route: "/settings" },
@@ -32,18 +44,36 @@ const accountItems = [
 export default function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { projects, selectedProject, setSelectedProjectId } = useProject();
+  const { projects, selectedProject, setSelectedProjectId, activities } = useProject();
 
   const [open,          setOpen]          = useState(false);
   const [showNotif,     setShowNotif]     = useState(false);
   const [showAccount,   setShowAccount]   = useState(false);
   const [searchValue,   setSearchValue]   = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [readSet,       setReadSet]       = useState<Set<number>>(
-    new Set(demoNotifications.flatMap((n, i) => (n.read ? [i] : [])))
-  );
+  // Ids of activity entries the user has read. Loaded from localStorage after
+  // mount (empty on the server) so it persists across reloads without a hydration
+  // mismatch. Any activity not in the set counts as unread.
+  const [readSet,       setReadSet]       = useState<Set<string>>(new Set());
   const [userEmail,     setUserEmail]     = useState<string>("");
   const [userName,      setUserName]      = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(NOTIF_READ_KEY);
+      if (raw) setReadSet(new Set(JSON.parse(raw) as string[]));
+    } catch (err) {
+      console.warn("[Topbar] Couldn't load read notifications:", err);
+    }
+  }, []);
+
+  function persistRead(next: Set<string>) {
+    try {
+      localStorage.setItem(NOTIF_READ_KEY, JSON.stringify([...next]));
+    } catch (err) {
+      console.warn("[Topbar] Couldn't persist read notifications:", err);
+    }
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -79,7 +109,7 @@ export default function Topbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const unreadCount = demoNotifications.filter((_, i) => !readSet.has(i)).length;
+  const unreadCount = activities.filter((a) => !readSet.has(a.id)).length;
 
   const searchResults = searchValue.trim().length > 0
     ? projects.filter(p =>
@@ -92,11 +122,17 @@ export default function Topbar() {
   const showSearchDrop = searchFocused && searchValue.trim().length > 0;
 
   function markAllRead() {
-    setReadSet(new Set(demoNotifications.map((_, i) => i)));
+    const next = new Set(activities.map((a) => a.id));
+    setReadSet(next);
+    persistRead(next);
   }
 
-  function handleNotifClick(i: number, route: string) {
-    setReadSet(prev => new Set([...prev, i]));
+  function handleNotifClick(id: string, route: string) {
+    setReadSet(prev => {
+      const next = new Set([...prev, id]);
+      persistRead(next);
+      return next;
+    });
     setShowNotif(false);
     router.push(route);
   }
@@ -298,27 +334,41 @@ export default function Topbar() {
                   </button>
                 )}
               </div>
-              {demoNotifications.map((n, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleNotifClick(i, n.route)}
-                  className={`w-full flex items-start gap-3 px-4 py-3 text-left border-b border-[#f0eded] last:border-b-0 hover:bg-[#f8f8f8] transition-colors ${readSet.has(i) ? "opacity-60" : ""}`}
-                >
-                  <div className="w-8 h-8 rounded-full bg-white border border-[#e4e2e1] flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="material-symbols-outlined" style={{ fontSize: "16px", color: n.color }}>{n.icon}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-[13px] text-[#333333] ${!readSet.has(i) ? "font-semibold" : ""}`}>{n.title}</p>
-                      <span className="text-[10px] text-[#999999] shrink-0">{n.time}</span>
-                    </div>
-                    <p className="text-[11px] text-[#666666] mt-0.5">{n.sub}</p>
-                  </div>
-                  {!readSet.has(i) && (
-                    <span className="w-2 h-2 rounded-full bg-[#e30613] shrink-0 mt-1.5" />
-                  )}
-                </button>
-              ))}
+              {activities.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <span className="material-symbols-outlined text-[#cccccc]" style={{ fontSize: "32px" }}>notifications_off</span>
+                  <p className="text-[13px] text-[#999999] mt-2">No notifications yet</p>
+                </div>
+              ) : (
+                <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
+                  {activities.map((a) => {
+                    const isRead = readSet.has(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => handleNotifClick(a.id, a.route)}
+                        className={`w-full flex items-start gap-3 px-4 py-3 text-left border-b border-[#f0eded] last:border-b-0 hover:bg-[#f8f8f8] transition-colors ${isRead ? "opacity-60" : ""}`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-white border border-[#e4e2e1] flex items-center justify-center shrink-0 mt-0.5">
+                          <span className="material-symbols-outlined" style={{ fontSize: "16px", color: a.color }}>{a.icon}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className={`text-[13px] text-[#333333] ${!isRead ? "font-semibold" : ""}`}>
+                              {a.text} <span className="font-bold">{a.bold}</span>
+                            </p>
+                            <span className="text-[10px] text-[#999999] shrink-0">{timeAgo(a.at)}</span>
+                          </div>
+                          <p className="text-[11px] text-[#666666] mt-0.5 line-clamp-2">{a.detail}</p>
+                        </div>
+                        {!isRead && (
+                          <span className="w-2 h-2 rounded-full bg-[#e30613] shrink-0 mt-1.5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

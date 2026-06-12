@@ -18,6 +18,23 @@ export async function createProject(input: { name: string; clientName: string; l
   const row = await prisma.appProject.create({
     data: { id: `proj_${Date.now()}`, name: input.name, clientName: input.clientName, location: input.location, engineer: input.engineer, pct: 0, isDelayed: false, sortOrder: count + 1 },
   });
+  // Record the assignment in the shared activity feed so it surfaces on the
+  // dashboard and in the notifications dropdown. Written here (server-side)
+  // rather than via the client logActivity so it survives the hard reload the
+  // new-project page does on submit.
+  await prisma.activityEntry.create({
+    data: {
+      id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      icon: "assignment_ind",
+      color: "#e30613",
+      route: "/dashboard",
+      text: `Assigned ${input.engineer} to`,
+      bold: input.name,
+      detail: `${input.name} (${input.clientName}, ${input.location}) was created and assigned to ${input.engineer}.`,
+      by: "You",
+      at: new Date(),
+    },
+  });
   return { id: row.id, name: row.name, clientName: row.clientName, location: row.location, pct: row.pct, engineer: row.engineer, isDelayed: row.isDelayed };
 }
 
