@@ -24,8 +24,10 @@ export async function createProject(input: { name: string; clientName: string; l
 // ── Team ──────────────────────────────────────────────────────────
 export type TeamMemberDTO = { id: string; name: string; role: string; email: string | null; phone: string | null; active: boolean };
 export async function loadTeam(): Promise<TeamMemberDTO[]> {
-  const rows = await prisma.teamMember.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, email: r.email, phone: r.phone, active: r.active }));
+  // Sourced from real User accounts (what the invite flow populates) so invited &
+  // registered members show up in assignee/engineer/inspector dropdowns across the app.
+  const rows = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+  return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, email: r.email, phone: null, active: true }));
 }
 
 // ── Activity feed ─────────────────────────────────────────────────

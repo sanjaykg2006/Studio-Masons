@@ -7,7 +7,7 @@ import { createProject } from "../../data";
 export default function NewProjectPage() {
   const router = useRouter();
   const { team } = useProject();
-  const engineers = team.map(m => m.name);
+  const engineers = team.filter(m => m.role === "SITE_ENGINEER").map(m => m.name);
   const [form, setForm] = useState({ name: "", clientName: "", location: "", engineer: "", notes: "" });
   const [submitted, setSubmitted] = useState(false);
 
