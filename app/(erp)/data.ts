@@ -221,13 +221,26 @@ export async function saveInspections(list: InspectionDTO[]): Promise<void> {
 }
 
 // ── ERP integration ───────────────────────────────────────────────
-export type IntegrationDTO = { id: string; name: string; category: string; desc: string; icon: string; iconBg: string; iconColor: string; status: string; lastSync: string | null; recordsSynced: number; enabled: boolean; apiKey: string; endpoint: string };
+// `hasKey` replaces the raw apiKey in the client payload — the secret stays on
+// the server and is never shipped to the browser. Writes that don't include a
+// new key leave the stored one untouched.
+export type IntegrationDTO = { id: string; name: string; category: string; desc: string; icon: string; iconBg: string; iconColor: string; status: string; lastSync: string | null; recordsSynced: number; enabled: boolean; hasKey: boolean; endpoint: string };
 export type SyncLogDTO = { id: string; integration: string; event: string; status: string; records: number; timestamp: string; duration: string };
 export type FieldMapDTO = { erp_field: string; external_field: string; integration: string; type: string; direction: string };
 export type WebhookDTO = { id: string; name: string; url: string; events: string[]; status: string; lastTriggered: string; successRate: number };
+
+function erpRowToDTO(r: { id: string; name: string; category: string; description: string; icon: string; iconBg: string; iconColor: string; status: string; lastSync: string | null; recordsSynced: number; enabled: boolean; apiKey: string; endpoint: string }): IntegrationDTO {
+  return { id: r.id, name: r.name, category: r.category, desc: r.description, icon: r.icon, iconBg: r.iconBg, iconColor: r.iconColor, status: r.status, lastSync: r.lastSync, recordsSynced: r.recordsSynced, enabled: r.enabled, hasKey: r.apiKey.trim().length > 0, endpoint: r.endpoint };
+}
+
+// Timestamp label matching how the UI renders sync/trigger times, e.g. "12 Jun, 10:02".
+function erpNowLabel(): string {
+  return new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 export async function loadIntegrations(): Promise<IntegrationDTO[]> {
   const rows = await prisma.erpIntegration.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, name: r.name, category: r.category, desc: r.description, icon: r.icon, iconBg: r.iconBg, iconColor: r.iconColor, status: r.status, lastSync: r.lastSync, recordsSynced: r.recordsSynced, enabled: r.enabled, apiKey: r.apiKey, endpoint: r.endpoint }));
+  return rows.map(erpRowToDTO);
 }
 export async function loadSyncLogs(): Promise<SyncLogDTO[]> {
   const rows = await prisma.erpSyncLog.findMany({ orderBy: { sortOrder: "asc" } });
@@ -240,4 +253,174 @@ export async function loadFieldMappings(): Promise<FieldMapDTO[]> {
 export async function loadWebhooks(): Promise<WebhookDTO[]> {
   const rows = await prisma.erpWebhook.findMany({ orderBy: { sortOrder: "asc" } });
   return rows.map((r) => ({ id: r.id, name: r.name, url: r.url, events: r.events, status: r.status, lastTriggered: r.lastTriggered, successRate: r.successRate }));
+}
+
+// Flip an integration on/off. Enabling only reports "connected" when it's actually
+// configured (endpoint + key present); otherwise it stays "disconnected".
+export async function toggleIntegration(id: string): Promise<IntegrationDTO> {
+  const cur = await prisma.erpIntegration.findUnique({ where: { id } });
+  if (!cur) throw new Error("Integration not found");
+  const enabled = !cur.enabled;
+  const configured = cur.apiKey.trim().length > 0 && cur.endpoint.trim().length > 0;
+  const status = enabled && configured ? "connected" : "disconnected";
+  const row = await prisma.erpIntegration.update({ where: { id }, data: { enabled, status } });
+  return erpRowToDTO(row);
+}
+
+// Persist endpoint + (optionally) a new key. A blank apiKey keeps the existing one,
+// so the saved secret never has to round-trip through the client.
+export async function saveIntegrationConfig(id: string, input: { endpoint: string; apiKey: string }): Promise<IntegrationDTO> {
+  const cur = await prisma.erpIntegration.findUnique({ where: { id } });
+  if (!cur) throw new Error("Integration not found");
+  const apiKey = input.apiKey.trim() ? input.apiKey.trim() : cur.apiKey;
+  const endpoint = input.endpoint.trim();
+  const configured = apiKey.trim().length > 0 && endpoint.length > 0;
+  const row = await prisma.erpIntegration.update({
+    where: { id },
+    data: { apiKey, endpoint, status: configured ? "connected" : "disconnected", enabled: configured },
+  });
+  return erpRowToDTO(row);
+}
+
+// Add a custom integration from the "Add integration" dialog.
+export async function createIntegration(input: { name: string; category: string; endpoint: string; apiKey: string }): Promise<IntegrationDTO> {
+  const max = await prisma.erpIntegration.aggregate({ _max: { sortOrder: true } });
+  const configured = input.apiKey.trim().length > 0 && input.endpoint.trim().length > 0;
+  const row = await prisma.erpIntegration.create({
+    data: {
+      id: `intg_${Date.now()}`,
+      name: input.name.trim(),
+      category: input.category.trim() || "Custom",
+      description: "Custom integration added from the ERP Integration page.",
+      icon: "extension", iconBg: "#1b1c1c", iconColor: "#ffffff",
+      status: configured ? "connected" : "disconnected",
+      lastSync: null, recordsSynced: 0, enabled: configured,
+      apiKey: input.apiKey.trim(), endpoint: input.endpoint.trim(),
+      sortOrder: (max._max.sortOrder ?? 0) + 1,
+    },
+  });
+  return erpRowToDTO(row);
+}
+
+// Real connection test: actually reaches the configured endpoint server-side,
+// measures latency, flips the integration to connected/error, and writes a
+// genuine sync-log row reflecting the true outcome.
+export async function testIntegration(id: string): Promise<{ integration: IntegrationDTO; log: SyncLogDTO }> {
+  const cur = await prisma.erpIntegration.findUnique({ where: { id } });
+  if (!cur) throw new Error("Integration not found");
+
+  const start = Date.now();
+  let ok = false;
+  let detail: string;
+  if (!cur.endpoint.trim()) {
+    detail = "no endpoint configured";
+  } else {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(cur.endpoint, {
+        method: "GET",
+        headers: cur.apiKey ? { Authorization: `Bearer ${cur.apiKey}` } : {},
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      ok = res.ok;
+      detail = `HTTP ${res.status}`;
+    } catch (e) {
+      detail = e instanceof Error ? (e.name === "AbortError" ? "timed out after 8s" : e.message) : "request failed";
+    }
+  }
+
+  const durationMs = Date.now() - start;
+  const ts = erpNowLabel();
+  const records = ok ? 1 : 0;
+  const min = await prisma.erpSyncLog.aggregate({ _min: { sortOrder: true } });
+  const logData = {
+    id: `L${Date.now()}`,
+    integration: cur.name,
+    event: ok ? `Connection test passed (${detail})` : `Connection test failed (${detail})`,
+    status: ok ? "success" : "failed",
+    records,
+    timestamp: ts,
+    duration: `${(durationMs / 1000).toFixed(1)}s`,
+    sortOrder: (min._min.sortOrder ?? 0) - 1, // newest logs sort to the top
+  };
+  const [log, integration] = await prisma.$transaction([
+    prisma.erpSyncLog.create({ data: logData }),
+    prisma.erpIntegration.update({ where: { id }, data: { status: ok ? "connected" : "error", lastSync: ts, recordsSynced: cur.recordsSynced + records } }),
+  ]);
+  return {
+    integration: erpRowToDTO(integration),
+    log: { id: log.id, integration: log.integration, event: log.event, status: log.status, records: log.records, timestamp: log.timestamp, duration: log.duration },
+  };
+}
+
+export async function createWebhook(input: { name: string; url: string; events?: string[] }): Promise<WebhookDTO> {
+  const max = await prisma.erpWebhook.aggregate({ _max: { sortOrder: true } });
+  const row = await prisma.erpWebhook.create({
+    data: {
+      id: `WH${Date.now()}`,
+      name: input.name.trim(),
+      url: input.url.trim(),
+      events: input.events && input.events.length ? input.events : ["custom.event"],
+      status: "active",
+      lastTriggered: "Never",
+      successRate: 0,
+      sortOrder: (max._max.sortOrder ?? 0) + 1,
+    },
+  });
+  return { id: row.id, name: row.name, url: row.url, events: row.events, status: row.status, lastTriggered: row.lastTriggered, successRate: row.successRate };
+}
+
+export async function toggleWebhook(id: string): Promise<WebhookDTO> {
+  const cur = await prisma.erpWebhook.findUnique({ where: { id } });
+  if (!cur) throw new Error("Webhook not found");
+  const status = cur.status === "active" ? "inactive" : "active";
+  const row = await prisma.erpWebhook.update({ where: { id }, data: { status } });
+  return { id: row.id, name: row.name, url: row.url, events: row.events, status: row.status, lastTriggered: row.lastTriggered, successRate: row.successRate };
+}
+
+// Real delivery: actually POSTs a JSON event to the webhook URL server-side,
+// then updates its status, last-triggered time, and a rolling success rate.
+export async function fireWebhook(id: string): Promise<{ webhook: WebhookDTO; delivered: boolean; detail: string }> {
+  const cur = await prisma.erpWebhook.findUnique({ where: { id } });
+  if (!cur) throw new Error("Webhook not found");
+
+  let delivered = false;
+  let detail: string;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(cur.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Webhook-Event": cur.events[0] ?? "test.ping" },
+      body: JSON.stringify({
+        event: cur.events[0] ?? "test.ping",
+        source: "studio-masons-erp",
+        webhook: cur.name,
+        timestamp: new Date().toISOString(),
+        data: { test: true },
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    delivered = res.ok;
+    detail = `HTTP ${res.status}`;
+  } catch (e) {
+    detail = e instanceof Error ? (e.name === "AbortError" ? "timed out after 8s" : e.message) : "request failed";
+  }
+
+  // Rolling success rate: first-ever delivery seeds it; afterwards an EWMA so the
+  // bar reacts to recent deliveries without throwing away history.
+  const sample = delivered ? 100 : 0;
+  const successRate = cur.lastTriggered === "Never" ? sample : Math.round(cur.successRate * 0.7 + sample * 0.3);
+  const row = await prisma.erpWebhook.update({
+    where: { id },
+    data: { status: delivered ? "active" : "failing", lastTriggered: erpNowLabel(), successRate },
+  });
+  return {
+    webhook: { id: row.id, name: row.name, url: row.url, events: row.events, status: row.status, lastTriggered: row.lastTriggered, successRate: row.successRate },
+    delivered,
+    detail,
+  };
 }

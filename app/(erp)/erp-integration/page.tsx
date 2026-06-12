@@ -1,6 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
-import { loadIntegrations, loadSyncLogs, loadFieldMappings, loadWebhooks } from "../data";
+import {
+  loadIntegrations, loadSyncLogs, loadFieldMappings, loadWebhooks,
+  toggleIntegration, saveIntegrationConfig, createIntegration, testIntegration,
+  createWebhook, toggleWebhook, fireWebhook,
+} from "../data";
+import { useToast } from "@/lib/toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,7 +21,7 @@ interface Integration {
   lastSync: string | null;
   recordsSynced: number;
   enabled: boolean;
-  apiKey: string;
+  hasKey: boolean;
   endpoint: string;
 }
 
@@ -78,11 +83,16 @@ const directionLabel: Record<string, { icon: string; text: string }> = {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ERPIntegrationPage() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState(0);
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [firingId, setFiringId] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState<string | null>(null);
   const [configDraft, setConfigDraft] = useState<{ apiKey: string; endpoint: string }>({ apiKey: "", endpoint: "" });
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDraft, setAddDraft] = useState({ name: "", category: "", endpoint: "", apiKey: "" });
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [webhookList, setWebhookList] = useState<Webhook[]>([]);
   const [fieldMappings, setFieldMappings] = useState<FieldMap[]>([]);
@@ -110,73 +120,112 @@ export default function ERPIntegrationPage() {
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
-  const handleToggle = (id: string) => {
-    setIntegrations(prev => prev.map(i => {
-      if (i.id !== id) return i;
-      const nowEnabled = !i.enabled;
-      return { ...i, enabled: nowEnabled, status: nowEnabled ? "disconnected" : "disconnected" };
-    }));
+  const handleToggle = async (id: string) => {
+    try {
+      const updated = await toggleIntegration(id);
+      setIntegrations(prev => prev.map(i => i.id === id ? (updated as Integration) : i));
+    } catch (err) {
+      console.warn("[ERP] toggle failed:", err);
+      toast.error("Couldn't update integration", "Please try again.");
+    }
   };
 
-  const handleSyncNow = (id: string) => {
+  // Real connection test: hits the configured endpoint server-side and records
+  // the true result. Resolves to "connected" or "error" — no fake success.
+  const handleSyncNow = async (id: string) => {
     setSyncingId(id);
     setIntegrations(prev => prev.map(i => i.id === id ? { ...i, status: "syncing" } : i));
-    setTimeout(() => {
+    try {
+      const { integration, log } = await testIntegration(id);
+      setIntegrations(prev => prev.map(i => i.id === id ? (integration as Integration) : i));
+      setLogs(prev => [log as SyncLog, ...prev]);
+      if (log.status === "success") toast.success("Connection test passed", `${integration.name}: ${log.event.replace(/^.*\(/, "").replace(/\)$/, "")}`);
+      else toast.error("Connection test failed", log.event);
+    } catch (err) {
+      console.warn("[ERP] sync failed:", err);
+      setIntegrations(prev => prev.map(i => i.id === id ? { ...i, status: "error" } : i));
+      toast.error("Sync failed", "Could not reach the integration.");
+    } finally {
       setSyncingId(null);
-      setIntegrations(prev => prev.map(i => {
-        if (i.id !== id) return i;
-        const now = "Just now";
-        const newLog: SyncLog = {
-          id: `L${Date.now()}`,
-          integration: i.name,
-          event: "Manual sync triggered",
-          status: "success",
-          records: Math.floor(Math.random() * 20) + 1,
-          timestamp: now,
-          duration: `${(Math.random() * 3 + 0.5).toFixed(1)}s`,
-        };
-        setLogs(prev => [newLog, ...prev]);
-        return { ...i, status: "connected", lastSync: now, recordsSynced: i.recordsSynced + newLog.records };
-      }));
-    }, 2400);
+    }
   };
 
   const handleOpenConfig = (integration: Integration) => {
-    setConfigDraft({ apiKey: integration.apiKey, endpoint: integration.endpoint });
+    // Never prefill the key — the server doesn't ship it. Blank means "keep existing".
+    setConfigDraft({ apiKey: "", endpoint: integration.endpoint });
     setConfigOpen(integration.id);
   };
 
-  const handleSaveConfig = () => {
-    setIntegrations(prev => prev.map(i => {
-      if (i.id !== configOpen) return i;
-      const hasConfig = configDraft.apiKey.trim() && configDraft.endpoint.trim();
-      return { ...i, apiKey: configDraft.apiKey, endpoint: configDraft.endpoint, status: hasConfig ? "connected" : "disconnected", enabled: !!hasConfig };
-    }));
-    setConfigOpen(null);
+  const handleSaveConfig = async () => {
+    if (!configOpen) return;
+    setSavingConfig(true);
+    try {
+      const updated = await saveIntegrationConfig(configOpen, configDraft);
+      setIntegrations(prev => prev.map(i => i.id === configOpen ? (updated as Integration) : i));
+      setConfigOpen(null);
+      toast.success("Configuration saved", updated.status === "connected" ? `${updated.name} is connected.` : `${updated.name} saved.`);
+    } catch (err) {
+      console.warn("[ERP] save config failed:", err);
+      toast.error("Couldn't save configuration", "Please try again.");
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
-  const handleToggleWebhook = (id: string) => {
-    setWebhookList(prev => prev.map(w => {
-      if (w.id !== id) return w;
-      return { ...w, status: w.status === "active" ? "inactive" : "active" };
-    }));
+  const handleAddIntegration = async () => {
+    if (!addDraft.name.trim()) return;
+    try {
+      const created = await createIntegration(addDraft);
+      setIntegrations(prev => [...prev, created as Integration]);
+      setAddDraft({ name: "", category: "", endpoint: "", apiKey: "" });
+      setAddOpen(false);
+      setActiveTab(0);
+      toast.success("Integration added", `${created.name} is ready.`);
+    } catch (err) {
+      console.warn("[ERP] create integration failed:", err);
+      toast.error("Couldn't add integration", "Please try again.");
+    }
   };
 
-  const handleAddWebhook = () => {
+  const handleToggleWebhook = async (id: string) => {
+    try {
+      const updated = await toggleWebhook(id);
+      setWebhookList(prev => prev.map(w => w.id === id ? (updated as Webhook) : w));
+    } catch (err) {
+      console.warn("[ERP] toggle webhook failed:", err);
+      toast.error("Couldn't update webhook", "Please try again.");
+    }
+  };
+
+  // Real delivery: POSTs a test event to the webhook URL and records the outcome.
+  const handleFireWebhook = async (id: string) => {
+    setFiringId(id);
+    try {
+      const { webhook, delivered, detail } = await fireWebhook(id);
+      setWebhookList(prev => prev.map(w => w.id === id ? (webhook as Webhook) : w));
+      if (delivered) toast.success("Test event delivered", `${webhook.name} responded ${detail}.`);
+      else toast.error("Delivery failed", `${webhook.name}: ${detail}.`);
+    } catch (err) {
+      console.warn("[ERP] fire webhook failed:", err);
+      toast.error("Delivery failed", "Could not reach the endpoint.");
+    } finally {
+      setFiringId(null);
+    }
+  };
+
+  const handleAddWebhook = async () => {
     if (!newWebhookName.trim() || !newWebhookUrl.trim()) return;
-    const newWh: Webhook = {
-      id: `WH${Date.now()}`,
-      name: newWebhookName,
-      url: newWebhookUrl,
-      events: ["custom.event"],
-      status: "active",
-      lastTriggered: "Never",
-      successRate: 0,
-    };
-    setWebhookList(prev => [newWh, ...prev]);
-    setNewWebhookName("");
-    setNewWebhookUrl("");
-    setNewWebhookOpen(false);
+    try {
+      const created = await createWebhook({ name: newWebhookName, url: newWebhookUrl });
+      setWebhookList(prev => [created as Webhook, ...prev]);
+      setNewWebhookName("");
+      setNewWebhookUrl("");
+      setNewWebhookOpen(false);
+      toast.success("Webhook created", created.name);
+    } catch (err) {
+      console.warn("[ERP] add webhook failed:", err);
+      toast.error("Couldn't create webhook", "Please try again.");
+    }
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────────
@@ -211,7 +260,7 @@ export default function ERPIntegrationPage() {
           <p className="text-[#666666]">Connect Studio Masons ERP to your external tools, accounting systems, and communication platforms.</p>
         </div>
         <button
-          onClick={() => { setActiveTab(0); }}
+          onClick={() => setAddOpen(true)}
           className="bg-[#e30613] text-white px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:opacity-90 shadow-sm transition-all text-[14px]">
           <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>add_circle</span>
           ADD INTEGRATION
@@ -518,6 +567,12 @@ export default function ERPIntegrationPage() {
                         style={{ width: "44px", height: "24px", borderRadius: "12px", background: wh.status === "active" ? "#e30613" : "#e4e2e1", position: "relative", border: "none", cursor: "pointer", transition: "background 0.2s" }}>
                         <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "white", position: "absolute", top: "3px", left: wh.status === "active" ? "23px" : "3px", transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
                       </button>
+                      <button onClick={() => handleFireWebhook(wh.id)} disabled={firingId === wh.id}
+                        className="px-3 py-1.5 rounded border border-[#e4e2e1] text-[11px] font-bold text-[#333333] hover:bg-[#f8f8f8] transition-all flex items-center gap-1.5 disabled:opacity-50"
+                        style={{ cursor: firingId === wh.id ? "not-allowed" : "pointer" }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: "14px", animation: firingId === wh.id ? "spin 1s linear infinite" : "none" }}>send</span>
+                        {firingId === wh.id ? "SENDING…" : "SEND TEST"}
+                      </button>
                       {wh.status === "failing" && (
                         <span className="text-[10px] font-bold text-[#ba1a1a] flex items-center gap-1">
                           <span className="material-symbols-outlined" style={{ fontSize: "12px" }}>error</span>
@@ -570,7 +625,11 @@ export default function ERPIntegrationPage() {
               <div className="flex flex-col gap-2">
                 <label className="text-[13px] font-bold text-[#e30613] uppercase">API Key / Secret</label>
                 <input value={configDraft.apiKey} onChange={e => setConfigDraft(d => ({ ...d, apiKey: e.target.value }))}
-                  type="password" placeholder="Paste your API key here" className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all font-mono" />
+                  type="password" placeholder={configTarget.hasKey ? "•••••••• (leave blank to keep current key)" : "Paste your API key here"}
+                  className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all font-mono" />
+                <p className="text-[11px] text-[#666666]">
+                  {configTarget.hasKey ? "A key is already saved. Leave this blank to keep it, or enter a new one to replace it." : "Stored securely on the server — it is never sent back to the browser."}
+                </p>
               </div>
               <div className="bg-[#f8f8f8] border border-[#e4e2e1] rounded-lg p-4">
                 <p className="text-[11px] font-bold text-[#666666] uppercase mb-2">Sync Direction</p>
@@ -583,7 +642,10 @@ export default function ERPIntegrationPage() {
             </div>
             <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex gap-3 justify-end">
               <button onClick={() => setConfigOpen(null)} className="px-5 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-white transition-all">CANCEL</button>
-              <button onClick={handleSaveConfig} className="px-6 py-2 bg-[#e30613] text-white rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all">SAVE & CONNECT</button>
+              <button onClick={handleSaveConfig} disabled={savingConfig}
+                className="px-6 py-2 bg-[#e30613] text-white rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all disabled:opacity-50">
+                {savingConfig ? "SAVING…" : "SAVE & CONNECT"}
+              </button>
             </div>
           </div>
         </div>
@@ -617,6 +679,51 @@ export default function ERPIntegrationPage() {
                 className="px-6 py-2 bg-[#e30613] text-white rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all"
                 style={{ opacity: !newWebhookName.trim() || !newWebhookUrl.trim() ? 0.5 : 1 }}>
                 CREATE WEBHOOK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Integration Modal ─────────────────────────────────────────────── */}
+      {addOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[32rem] rounded-xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
+              <h3 className="text-[18px] font-bold text-[#333333]">Add Integration</h3>
+              <button onClick={() => setAddOpen(false)} className="text-[#666666] hover:text-[#e30613] transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Name</label>
+                <input value={addDraft.name} onChange={e => setAddDraft(d => ({ ...d, name: e.target.value }))}
+                  placeholder="e.g. Stripe" className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">Category</label>
+                <input value={addDraft.category} onChange={e => setAddDraft(d => ({ ...d, category: e.target.value }))}
+                  placeholder="e.g. Payments" className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">API Endpoint</label>
+                <input value={addDraft.endpoint} onChange={e => setAddDraft(d => ({ ...d, endpoint: e.target.value }))}
+                  placeholder="https://api.example.com/v1" className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all font-mono" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold text-[#e30613] uppercase">API Key / Secret</label>
+                <input value={addDraft.apiKey} onChange={e => setAddDraft(d => ({ ...d, apiKey: e.target.value }))}
+                  type="password" placeholder="Paste your API key here" className="bg-white border border-[#e4e2e1] rounded p-3 text-[14px] focus:outline-none focus:border-[#e30613] transition-all font-mono" />
+                <p className="text-[11px] text-[#666666]">Endpoint + key are needed for the integration to connect. You can add them later.</p>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex gap-3 justify-end">
+              <button onClick={() => setAddOpen(false)} className="px-5 py-2 border border-[#e4e2e1] rounded text-[13px] font-bold text-[#333333] hover:bg-white transition-all">CANCEL</button>
+              <button onClick={handleAddIntegration}
+                className="px-6 py-2 bg-[#e30613] text-white rounded text-[13px] font-bold hover:opacity-90 shadow-sm transition-all"
+                style={{ opacity: !addDraft.name.trim() ? 0.5 : 1 }}>
+                ADD INTEGRATION
               </button>
             </div>
           </div>
