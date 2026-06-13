@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadQualityPage, saveInspections, type QualityChecklistDTO } from "../data";
+import { loadQualityPage, saveInspections, type QualityChecklistDTO, type QualityTemplateDTO } from "../data";
 
 type Result = "Pass" | "Fail" | "Conditional" | "Draft";
 
@@ -15,6 +15,7 @@ interface Inspection {
   result: Result;
   score: number;
   remarks?: string;
+  workType?: string;
 }
 
 const RESULT_STYLE: Record<Result, string> = {
@@ -46,15 +47,18 @@ export default function QualityPage() {
 
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const [template, setTemplate] = useState<QualityChecklistDTO[]>([]);
+  const [templates, setTemplates] = useState<QualityTemplateDTO[]>([]);
 
   // Live checklist (right panel) + the inspection currently being conducted.
   const [checks2, setChecks2] = useState<ReturnType<typeof freshChecklist>>([]);
-  const [active, setActive] = useState<{ project: string; area: string; category: string; inspector: string; remarks: string } | null>(null);
+  const [active, setActive] = useState<{ project: string; area: string; category: string; inspector: string; remarks: string; workType: string } | null>(null);
 
   // New inspection modal
   const [showNew, setShowNew] = useState(false);
-  const [newForm, setNewForm] = useState({ project: "", area: "", category: "", inspector: "", remarks: "" });
+  const [newForm, setNewForm] = useState({ project: "", area: "", category: "", inspector: "", remarks: "", workType: "" });
+  // Work-type picker: filter by discipline + free-text search over the templates.
+  const [discFilter, setDiscFilter] = useState("All");
+  const [tplSearch, setTplSearch] = useState("");
 
   // Detail / edit modal
   const [editing, setEditing] = useState<Inspection | null>(null);
@@ -64,14 +68,14 @@ export default function QualityPage() {
   // Load inspections + checklist template from the database, then persist changes.
   useEffect(() => {
     loadQualityPage()
-      .then(d => { setInspections(d.inspections as Inspection[]); setTemplate(d.checklist); setChecks2(freshChecklist(d.checklist)); })
+      .then(d => { setInspections(d.inspections as Inspection[]); setTemplates(d.templates); })
       .catch(err => console.warn("[Quality] load failed:", err))
       .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    saveInspections(inspections.map(i => ({ id: i.id, project: i.project, area: i.area, category: i.category, inspector: i.inspector, date: i.date, result: i.result, score: i.score, remarks: i.remarks ?? "" })))
+    saveInspections(inspections.map(i => ({ id: i.id, project: i.project, area: i.area, category: i.category, inspector: i.inspector, date: i.date, result: i.result, score: i.score, remarks: i.remarks ?? "", workType: i.workType ?? "" })))
       .catch(err => console.warn("[Quality] save failed:", err));
   }, [inspections, hydrated]);
 
@@ -85,6 +89,13 @@ export default function QualityPage() {
   const totalChecked = checks2.flatMap(c => c.items).filter(i => i.checked).length;
   const totalItems = checks2.flatMap(c => c.items).length;
 
+  // Work-type picker: discipline tabs + search over template names.
+  const disciplines = ["All", ...Array.from(new Set(templates.map(t => t.discipline)))];
+  const filteredTemplates = templates.filter(t =>
+    (discFilter === "All" || t.discipline === discFilter) &&
+    t.name.toLowerCase().includes(tplSearch.trim().toLowerCase())
+  );
+
   // Stats derived from the live inspection list.
   const stats = [
     { label: "Total Checks", value: String(inspections.length),                                  icon: "fact_check", color: "#e30613" },
@@ -94,8 +105,9 @@ export default function QualityPage() {
   ];
 
   function startInspection() {
+    const tpl = templates.find(t => t.name === newForm.workType);
     setActive({ ...newForm, project: newForm.project || projects[0]?.name || "" });
-    setChecks2(freshChecklist(template));
+    setChecks2(freshChecklist(tpl?.categories ?? []));
     setShowNew(false);
   }
 
@@ -113,10 +125,11 @@ export default function QualityPage() {
       result,
       score,
       remarks: active.remarks,
+      workType: active.workType || "",
     };
     setInspections(prev => [insp, ...prev]);
     setActive(null);
-    setChecks2(freshChecklist(template));
+    setChecks2([]);
   }
 
   function openEdit(insp: Inspection) {
@@ -147,7 +160,7 @@ export default function QualityPage() {
           <h2 className="text-[32px] font-bold text-[#333333] mb-2">Quality Checks</h2>
           <p className="text-[#666666]">Systematic inspection of workmanship, materials, and compliance across all active sites.</p>
         </div>
-        <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "" }); setShowNew(true); }}
+        <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "", workType: "" }); setDiscFilter("All"); setTplSearch(""); setShowNew(true); }}
           className="bg-[#e30613] text-white px-6 py-2.5 rounded font-bold flex items-center gap-2 hover:opacity-90 shadow-sm transition-all">
           <span className="material-symbols-outlined" style={{fontSize:"20px"}}>add_circle</span>
           NEW INSPECTION
@@ -212,11 +225,12 @@ export default function QualityPage() {
             </div>
             {active && (
               <div className="text-[11px] text-[#666666] mt-2">
-                {active.project} · {active.area || "—"} · {active.inspector || "—"}
+                {active.workType ? <span className="font-bold text-[#333333]">{active.workType}</span> : null}
+                {active.workType ? " · " : ""}{active.project} · {active.area || "—"} · {active.inspector || "—"}
               </div>
             )}
             <div style={{height:"4px",background:"#e4e2e1",borderRadius:"2px",marginTop:"12px"}}>
-              <div style={{width:`${(totalChecked/totalItems)*100}%`,height:"100%",background:"#e30613",borderRadius:"2px",transition:"width 0.3s"}} />
+              <div style={{width:`${totalItems > 0 ? (totalChecked/totalItems)*100 : 0}%`,height:"100%",background:"#e30613",borderRadius:"2px",transition:"width 0.3s"}} />
             </div>
           </div>
 
@@ -224,7 +238,7 @@ export default function QualityPage() {
             <div className="p-10 flex flex-col items-center justify-center text-center gap-3" style={{minHeight:"320px"}}>
               <span className="material-symbols-outlined" style={{fontSize:"40px",color:"#e4e2e1"}}>checklist</span>
               <p className="text-[14px] text-[#666666]">No active inspection.</p>
-              <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "" }); setShowNew(true); }}
+              <button onClick={() => { setNewForm({ project: "", area: "", category: "", inspector: "", remarks: "", workType: "" }); setDiscFilter("All"); setTplSearch(""); setShowNew(true); }}
                 className="text-[13px] font-bold text-[#e30613] hover:underline">Start a new inspection →</button>
             </div>
           ) : (
@@ -260,12 +274,12 @@ export default function QualityPage() {
       {/* New Inspection Modal */}
       {showNew && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6" style={{background:"rgba(0,0,0,0.45)"}} onClick={() => setShowNew(false)}>
-          <div className="bg-white border border-[#e4e2e1] w-full max-w-[480px] rounded-lg overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center">
+          <div className="bg-white border border-[#e4e2e1] w-full max-w-[480px] max-h-[90vh] rounded-lg overflow-hidden shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center shrink-0">
               <h3 className="text-[20px] font-bold text-[#333333]">New Inspection</h3>
               <button onClick={() => setShowNew(false)} className="text-[#666666] flex"><span className="material-symbols-outlined">close</span></button>
             </div>
-            <div className="p-6 flex flex-col gap-4">
+            <div className="p-6 flex flex-col gap-4 overflow-y-auto custom-scrollbar">
               <div className="flex flex-col gap-1.5">
                 <label className={labelCls}>Project</label>
                 <select value={newForm.project} onChange={e => setNewForm(f => ({ ...f, project: e.target.value }))} className={inputCls + " bg-white"}>
@@ -273,6 +287,37 @@ export default function QualityPage() {
                   {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                 </select>
               </div>
+
+              {/* Work-type checklist picker: discipline tabs + search + selectable list */}
+              <div className="flex flex-col gap-1.5">
+                <label className={labelCls}>Work Type / Checklist</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {disciplines.map(d => (
+                    <button key={d} type="button" onClick={() => setDiscFilter(d)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all ${discFilter === d ? "bg-[#e30613] text-white border-[#e30613]" : "bg-white text-[#666666] border-[#e4e2e1] hover:border-[#e30613]/40"}`}>
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <input value={tplSearch} onChange={e => setTplSearch(e.target.value)} placeholder="Search checklists…" className={inputCls} />
+                <div className="border border-[#e4e2e1] rounded max-h-[180px] overflow-y-auto custom-scrollbar divide-y divide-[#e4e2e1]">
+                  {filteredTemplates.length === 0 ? (
+                    <div className="px-3 py-4 text-[12px] text-[#999999] text-center">No checklists match.</div>
+                  ) : filteredTemplates.map(t => (
+                    <div key={t.id} onClick={() => setNewForm(f => ({ ...f, workType: t.name }))}
+                      className={`flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer transition-all ${newForm.workType === t.name ? "bg-[#e30613]/5" : "hover:bg-[#f8f8f8]"}`}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div style={{width:"16px",height:"16px",borderRadius:"50%",border:`2px solid ${newForm.workType===t.name?"#e30613":"#e4e2e1"}`,background:newForm.workType===t.name?"#e30613":"white",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {newForm.workType === t.name && <div style={{width:"6px",height:"6px",borderRadius:"50%",background:"white"}} />}
+                        </div>
+                        <span className="text-[13px] text-[#333333] truncate">{t.name}</span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase text-[#999999] shrink-0">{t.discipline}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className={labelCls}>Area</label>
@@ -292,10 +337,10 @@ export default function QualityPage() {
                 <textarea value={newForm.remarks} onChange={e => setNewForm(f => ({ ...f, remarks: e.target.value }))} rows={2} placeholder="Notes for this inspection…" className={inputCls + " resize-none font-[inherit]"} />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-end gap-3 shrink-0">
               <button onClick={() => setShowNew(false)} className="px-5 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px]">Cancel</button>
-              <button onClick={startInspection} disabled={!newForm.project && projects.length === 0}
-                className="px-6 py-2 rounded text-white font-bold text-[13px]" style={{background:"#e30613"}}>Start Inspection</button>
+              <button onClick={startInspection} disabled={!newForm.workType || (!newForm.project && projects.length === 0)}
+                className="px-6 py-2 rounded text-white font-bold text-[13px] disabled:opacity-50 disabled:cursor-not-allowed" style={{background:"#e30613"}}>Start Inspection</button>
             </div>
           </div>
         </div>
@@ -313,6 +358,7 @@ export default function QualityPage() {
               <div className="grid grid-cols-2 gap-4 bg-[#f8f8f8] border border-[#e4e2e1] rounded p-4">
                 {[
                   { k: "Project", v: editing.project },
+                  { k: "Work Type", v: editing.workType || "—" },
                   { k: "Area", v: editing.area },
                   { k: "Category", v: editing.category },
                   { k: "Inspector", v: editing.inspector },

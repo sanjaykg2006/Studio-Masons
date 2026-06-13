@@ -203,20 +203,30 @@ export async function saveScope(list: ScopeDTO[]): Promise<void> {
 }
 
 // ── Quality ───────────────────────────────────────────────────────
-export type InspectionDTO = { id: string; project: string; area: string; category: string; inspector: string; date: string; result: string; score: number; remarks: string };
+export type InspectionDTO = { id: string; project: string; area: string; category: string; inspector: string; date: string; result: string; score: number; remarks: string; workType: string };
 export type QualityChecklistDTO = { name: string; items: { label: string; linked: boolean }[] };
+export type QualityTemplateDTO = { id: string; name: string; discipline: string; categories: QualityChecklistDTO[] };
 export async function loadInspections(): Promise<InspectionDTO[]> {
   const rows = await prisma.qualityInspection.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, project: r.projectName, area: r.area, category: r.category, inspector: r.inspector, date: r.date, result: r.result, score: r.score, remarks: r.remarks ?? "" }));
+  return rows.map((r) => ({ id: r.id, project: r.projectName, area: r.area, category: r.category, inspector: r.inspector, date: r.date, result: r.result, score: r.score, remarks: r.remarks ?? "", workType: r.workType ?? "" }));
 }
-export async function loadQualityChecklist(): Promise<QualityChecklistDTO[]> {
-  const rows = await prisma.qualityChecklistCategory.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ name: r.name, items: r.items as { label: string; linked: boolean }[] }));
+// Work-type checklists with their sections, ordered by discipline then name.
+export async function loadQualityTemplates(): Promise<QualityTemplateDTO[]> {
+  const rows = await prisma.qualityChecklistTemplate.findMany({
+    orderBy: { sortOrder: "asc" },
+    include: { categories: { orderBy: { sortOrder: "asc" } } },
+  });
+  return rows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    discipline: t.discipline,
+    categories: t.categories.map((c) => ({ name: c.name, items: c.items as { label: string; linked: boolean }[] })),
+  }));
 }
 export async function saveInspections(list: InspectionDTO[]): Promise<void> {
   await prisma.$transaction([
     prisma.qualityInspection.deleteMany({}),
-    prisma.qualityInspection.createMany({ data: list.map((q, i) => ({ id: q.id, projectName: q.project, area: q.area, category: q.category, inspector: q.inspector, date: q.date, result: q.result, score: q.score, remarks: q.remarks ?? "", sortOrder: i })) }),
+    prisma.qualityInspection.createMany({ data: list.map((q, i) => ({ id: q.id, projectName: q.project, area: q.area, category: q.category, inspector: q.inspector, date: q.date, result: q.result, score: q.score, remarks: q.remarks ?? "", workType: q.workType || "", sortOrder: i })) }),
   ]);
 }
 
@@ -382,8 +392,8 @@ export async function loadSurveyPage() {
   return { surveys, checklist };
 }
 export async function loadQualityPage() {
-  const [inspections, checklist] = await Promise.all([loadInspections(), loadQualityChecklist()]);
-  return { inspections, checklist };
+  const [inspections, templates] = await Promise.all([loadInspections(), loadQualityTemplates()]);
+  return { inspections, templates };
 }
 
 export async function createWebhook(input: { name: string; url: string; events?: string[] }): Promise<WebhookDTO> {

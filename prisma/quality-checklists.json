@@ -1,0 +1,4011 @@
+[
+  {
+    "id": "qct_electricalmcbdb_0",
+    "name": "Electrical - MCB & DB",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Make and quality as per spec.",
+            "linked": false
+          },
+          {
+            "label": "DB frame grouted properly in wall (in floor if floor mounted). Frame is painted, aligned square with the DB and vertically in plumb.",
+            "linked": false
+          },
+          {
+            "label": "Unused knockouts of the DB are closed with rubber bushings",
+            "linked": false
+          },
+          {
+            "label": "DB is earthed properly at two points. Check that the paint at the earthing contact is removed.",
+            "linked": false
+          },
+          {
+            "label": "Internal earth connected to earthing bolt.",
+            "linked": false
+          },
+          {
+            "label": "All terminations in MCBs done with lugs.",
+            "linked": false
+          },
+          {
+            "label": "Circuit identification provided with ferrules on the wires.",
+            "linked": false
+          },
+          {
+            "label": "Incoming cable glanded properly. Gland is earthed. Gland is held firmly with check nut.",
+            "linked": false
+          },
+          {
+            "label": "DB name plate provided (Printed sticker / Aluminium plates glued and screwed)",
+            "linked": false
+          },
+          {
+            "label": "Doors of the DB opens fully and easily.",
+            "linked": false
+          },
+          {
+            "label": "Pad locking arrangement provided on the DB.",
+            "linked": false
+          },
+          {
+            "label": "All the wires have adequate loop, are dressed properly,",
+            "linked": false
+          },
+          {
+            "label": "DB cleaned thoroughly.",
+            "linked": false
+          },
+          {
+            "label": "All cables and wires meggered.",
+            "linked": false
+          },
+          {
+            "label": "Internal wiring (from Incomer to outgoing bus bars) done with factory formed cables.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_cablelaying_1",
+    "name": "CABLE LAYING",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Cable on the tray",
+            "linked": false
+          },
+          {
+            "label": "Make and quality as per spec.",
+            "linked": false
+          },
+          {
+            "label": "Cable tray / raceway laid as per approved drawing.",
+            "linked": false
+          },
+          {
+            "label": "Cable Jack and rollers used for drawing the cable. No twists formed during laying",
+            "linked": false
+          },
+          {
+            "label": "Cable dressed properly on the cable tray, clamps/ cable ties provided at every 900mm max.",
+            "linked": false
+          },
+          {
+            "label": "Cable identification tag is provided at both ends",
+            "linked": false
+          },
+          {
+            "label": "No bruises, damage to the cable.",
+            "linked": false
+          },
+          {
+            "label": "Adequate bending radius provided.(12d)",
+            "linked": false
+          },
+          {
+            "label": "Cable is supported throughout its length, cable is not hanging loose.",
+            "linked": false
+          },
+          {
+            "label": "Where cable passing through walls or floors ensure GI / PVC sleeve is provided.",
+            "linked": false
+          },
+          {
+            "label": "Cable laid in ground",
+            "linked": false
+          },
+          {
+            "label": "Before laying the cable ensure trench depth is as per spec. (min 750mm for LT & 900mm for HT)",
+            "linked": false
+          },
+          {
+            "label": "All debris, filth and rocks removed from the trench.",
+            "linked": false
+          },
+          {
+            "label": "Sand bedding and brick lining is done as per details in the shop drawing / spec.",
+            "linked": false
+          },
+          {
+            "label": "Ensure Cables laid on sand bed side by side, no crossing of cables.",
+            "linked": false
+          },
+          {
+            "label": "Backfilling done with soft soil, remove stones, filth debris from the soil.",
+            "linked": false
+          },
+          {
+            "label": "Cable markers provided at every 10mtrs and at every change of direction OR as indicated in a drawing.",
+            "linked": false
+          },
+          {
+            "label": "Megger the cable after laying is over.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_structuralerectionwork_2",
+    "name": "Structural Erection work",
+    "discipline": "Structural",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check for erection layout at site.",
+            "linked": false
+          },
+          {
+            "label": "Check sequence of erection as per layout drawing & requirement",
+            "linked": false
+          },
+          {
+            "label": "Check availibity of fabricated material at site as per sequence",
+            "linked": false
+          },
+          {
+            "label": "Check for basic diemenions of fabricated material before erection",
+            "linked": false
+          },
+          {
+            "label": "Check procedure of stacking fabricated material at site.",
+            "linked": false
+          },
+          {
+            "label": "Check availibity & specification of bolts /hardware as per shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Check availibity of required capacity crane with test certificate",
+            "linked": false
+          },
+          {
+            "label": "Check availibity of required chery picker with test certificate",
+            "linked": false
+          },
+          {
+            "label": "Check availibity of required scaffolding /ladder certified by VW safety Dept.",
+            "linked": false
+          },
+          {
+            "label": "Check availibity of required lifting material like wire rope,chain block,chain pulley with test certificate",
+            "linked": false
+          },
+          {
+            "label": "Check for safety training & instruction regarding PPE's to workers before erection",
+            "linked": false
+          },
+          {
+            "label": "Check for foundations as per civil & structural drawing",
+            "linked": false
+          },
+          {
+            "label": "Check for temporary tie/supports to erected items before leaving erection site.",
+            "linked": false
+          },
+          {
+            "label": "Check for alignment of main structure",
+            "linked": false
+          },
+          {
+            "label": "Check for erection of sub structure",
+            "linked": false
+          },
+          {
+            "label": "Check for alignment of total structure",
+            "linked": false
+          },
+          {
+            "label": "Check for nut bolt tightening report.",
+            "linked": false
+          },
+          {
+            "label": "Check for final touch up paint",
+            "linked": false
+          },
+          {
+            "label": "Check for readiness of structure for sheeting",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_fireandsmokedampers_3",
+    "name": "FIRE AND SMOKE DAMPERS",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Material is of correct thickness and type ( powder coated/ painted),",
+            "linked": false
+          },
+          {
+            "label": "Fusible link and springs in place.",
+            "linked": false
+          },
+          {
+            "label": "All nut bolts at flanges are in place & tightened, appropriate gasket used between flanges.",
+            "linked": false
+          },
+          {
+            "label": "No visible damage",
+            "linked": false
+          },
+          {
+            "label": "Wall opening around the damper is sealed properly",
+            "linked": false
+          },
+          {
+            "label": "Damper properly supported",
+            "linked": false
+          },
+          {
+            "label": "For motorised dampers:",
+            "linked": false
+          },
+          {
+            "label": "Adequate spece around the actuator for maintenance",
+            "linked": false
+          },
+          {
+            "label": "Power supply provided.",
+            "linked": false
+          },
+          {
+            "label": "FAS loop connection completed",
+            "linked": false
+          },
+          {
+            "label": "Action",
+            "linked": false
+          },
+          {
+            "label": "Ensure that the specifications, drawing and O&M manual are available on site.",
+            "linked": false
+          },
+          {
+            "label": "Remove the fuse link and check if the blades close tightly",
+            "linked": false
+          },
+          {
+            "label": "Motorised Dampers",
+            "linked": false
+          },
+          {
+            "label": "Switch on power supply to the damper actuator",
+            "linked": false
+          },
+          {
+            "label": "Simulate a fire signal to the damper acuator",
+            "linked": false
+          },
+          {
+            "label": "Switch off power supply to the damper actuator",
+            "linked": false
+          },
+          {
+            "label": "Fire damper shall be normally open.",
+            "linked": false
+          },
+          {
+            "label": "Fire damper shall be normally open.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_fapawiring_4",
+    "name": "FAPA WIRING",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "All materials used are as per approval and specification",
+            "linked": false
+          },
+          {
+            "label": "All materials used/installed are defect/damage free.",
+            "linked": true
+          },
+          {
+            "label": "Routing and layout of the cable is as per approved shop drawings and easily traceable.",
+            "linked": false
+          },
+          {
+            "label": "No joints in the cable. Joints allowed only at the devices/panel.",
+            "linked": false
+          },
+          {
+            "label": "Cables are dropped from as per device locations shown in approved drawing and sufficient length is available for termination.",
+            "linked": false
+          },
+          {
+            "label": "Proper identification label to be provided at terminals",
+            "linked": false
+          },
+          {
+            "label": "Testing should be done for continuity,earth fault,shorts etc",
+            "linked": false
+          },
+          {
+            "label": "Color coding followed as per spec.",
+            "linked": false
+          },
+          {
+            "label": "Ensure cables are fixed strongly with proper clip/clamp at minimum spacings as per specification and standards",
+            "linked": false
+          },
+          {
+            "label": "Sharp bends not allowed.",
+            "linked": false
+          },
+          {
+            "label": "cables are installed in proper alignment without over lapping",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_distributionboard_5",
+    "name": "Distribution board",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Ensure the DB is of approved make before installation",
+            "linked": false
+          },
+          {
+            "label": "Check whether the DB installed as per the approved GA drawing",
+            "linked": false
+          },
+          {
+            "label": "Check whether the location of the DB installed is as per the approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Check whether the DB is concealed or surface mounted as per the drawing/user requirement",
+            "linked": false
+          },
+          {
+            "label": "Check for the hight of the DB from the FFL is as per the approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Check for the proper mounting arrangement is done for the surface mounted DBs",
+            "linked": false
+          },
+          {
+            "label": "Check the Provision made for Incoming and outgoing cables are proper.",
+            "linked": false
+          },
+          {
+            "label": "Check the Provision made for earthing are proper.",
+            "linked": false
+          },
+          {
+            "label": "Ensure the naming done for the DB is in line with the requirement.",
+            "linked": false
+          },
+          {
+            "label": "Check for the civil fineshes done properly for the concealed DBs",
+            "linked": false
+          },
+          {
+            "label": "Check for the incoming and out going cables entry with correct size DC Glands.",
+            "linked": false
+          },
+          {
+            "label": "Check for the earthing is done properly",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_sprinklerworkspiping_6",
+    "name": "Sprinkler Works, Piping",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "All materials are as per approval and specification",
+            "linked": false
+          },
+          {
+            "label": "Approved drawing is followed",
+            "linked": false
+          },
+          {
+            "label": "Pipe routing and layout is as per approved shop drawings",
+            "linked": false
+          },
+          {
+            "label": "Pipes sizes are as per approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "All materials used are new and in good condition without any rust",
+            "linked": false
+          },
+          {
+            "label": "Visually check wheteher all joints are weled/connected properly.",
+            "linked": false
+          },
+          {
+            "label": "Check proper supports and minimum spacing",
+            "linked": false
+          },
+          {
+            "label": "Check the pipe is aligned perfectly",
+            "linked": false
+          },
+          {
+            "label": "Flexible pipes are connected properly and tightened",
+            "linked": false
+          },
+          {
+            "label": "Primer/painting provided as per specification and standards",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvacpiping_7",
+    "name": "HVAC -Piping",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Appearance (Clean/Rusted)",
+            "linked": false
+          },
+          {
+            "label": "Piping Material (MS/GI)",
+            "linked": false
+          },
+          {
+            "label": "Thickness/Class of the pipe (Light/Medium/Heavy)",
+            "linked": false
+          },
+          {
+            "label": "Type of pipe (ERW/Seamless)",
+            "linked": false
+          },
+          {
+            "label": "Check spacing of the pipe support",
+            "linked": false
+          },
+          {
+            "label": "Saddles provided for chilled water pipes",
+            "linked": false
+          },
+          {
+            "label": "Jointing/Welding of the pipes confirms to good Workman ship",
+            "linked": false
+          },
+          {
+            "label": "Air vents are provided",
+            "linked": false
+          },
+          {
+            "label": "Fixing of the valves as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Gasket for valves",
+            "linked": false
+          },
+          {
+            "label": "Drain plugs/valves are provided",
+            "linked": false
+          },
+          {
+            "label": "Positioning of valves (Proper/Improper)",
+            "linked": false
+          },
+          {
+            "label": "Check availability of loop for initial flushing",
+            "linked": false
+          },
+          {
+            "label": "Flushing of the chilled water piping after Joints welded",
+            "linked": false
+          },
+          {
+            "label": "Pipe sleeve for wall/ceiling crossing",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvacpipeinsulation_8",
+    "name": "HVAC -Pipe Insulation",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check that pipe Routing is in accordance with approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Check all weld beads/fillets are visually satisfactory",
+            "linked": false
+          },
+          {
+            "label": "Check spacing of supports are correct for pipe size and standard/ spec. reqts.",
+            "linked": false
+          },
+          {
+            "label": "Check size & positioning of suspenders & Anchors per pipe size and std/Specs.",
+            "linked": false
+          },
+          {
+            "label": "Check the spacing between joints of the pipe conforms to applicable Std/Specs.",
+            "linked": false
+          },
+          {
+            "label": "Check for Straightness, Leveling, Alingment & Verticality of the pipes.",
+            "linked": false
+          },
+          {
+            "label": "Check flange joints for proper sealing with rubber gasket and tightening of fasteners",
+            "linked": false
+          },
+          {
+            "label": "Check that pipe-sleeves at walls/floors are as per approved drawing, and are cut flush with",
+            "linked": false
+          },
+          {
+            "label": "Check direction of NRV and Globe Valves; and adequate access for all valve-handles.",
+            "linked": false
+          },
+          {
+            "label": "Check finish/final paint coat of AG piping & support is smooth, without wrinkles, sags, runs, scratches and damages.",
+            "linked": false
+          },
+          {
+            "label": "Check proper insulation material used",
+            "linked": false
+          },
+          {
+            "label": "Check thickness of the material used",
+            "linked": false
+          },
+          {
+            "label": "check surface of the pipes are cleaned",
+            "linked": false
+          },
+          {
+            "label": "Check applicaion of the insulation without leaving air gaps",
+            "linked": false
+          },
+          {
+            "label": "check alluminum cladding with 26 G",
+            "linked": false
+          },
+          {
+            "label": "Application of the bitumen",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvacfan_9",
+    "name": "HVAC -Fan",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Type of fan",
+            "linked": false
+          },
+          {
+            "label": "Anti-vibration mounts",
+            "linked": false
+          },
+          {
+            "label": "Foundation (as per manufacture drawing)",
+            "linked": false
+          },
+          {
+            "label": "Mounting of fan over foundation",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvacdiffusergrill_10",
+    "name": "HVAC -DiffuserGrill",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Quality (Acceptable/ Unacceptable)",
+            "linked": false
+          },
+          {
+            "label": "Painting (Proper/ Imprpoper)",
+            "linked": false
+          },
+          {
+            "label": "Louvers (Straight/ Bent)",
+            "linked": false
+          },
+          {
+            "label": "Alignment- Proper/Improper",
+            "linked": false
+          },
+          {
+            "label": "Fixing/ Fasteners ( Proper/ Improper)",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvaccassetteunits_11",
+    "name": "HVAC -Cassette units",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Delivary of 2 TR Cassette units As per Drawg",
+            "linked": false
+          },
+          {
+            "label": "Installation of Cassette units 2 nos",
+            "linked": false
+          },
+          {
+            "label": "Refrigerent pipe conection for Cassette Indoor units",
+            "linked": false
+          },
+          {
+            "label": "Erection of Condenser units on terrace as per Drwg.",
+            "linked": false
+          },
+          {
+            "label": "Refrigerent pipe conection for Condenser units on terrace",
+            "linked": false
+          },
+          {
+            "label": "Pressure testing for Ref.pipe",
+            "linked": true
+          },
+          {
+            "label": "Insulation for Refrigerant pipe",
+            "linked": false
+          },
+          {
+            "label": "Power wire conection for indoor to outdoor unit",
+            "linked": false
+          },
+          {
+            "label": "Drain pipe conection for Cassette units",
+            "linked": false
+          },
+          {
+            "label": "Insulation for Drain pipe",
+            "linked": false
+          },
+          {
+            "label": "Power conection for Cassette(Elec.Panel to Cassette unit )",
+            "linked": false
+          },
+          {
+            "label": "Commissioning of Cassette unit",
+            "linked": false
+          },
+          {
+            "label": "Fixing of Thermostate",
+            "linked": false
+          },
+          {
+            "label": "Microprocessor panel which should be possible to hook up to automation",
+            "linked": false
+          },
+          {
+            "label": "Installation of Voltage Stablizer near outdoor unit",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_hvacahu_12",
+    "name": "HVAC -AHU",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "FAN & ACCS :",
+            "linked": false
+          },
+          {
+            "label": "Type of mounting -: Floor / Ceiling",
+            "linked": false
+          },
+          {
+            "label": "Model",
+            "linked": false
+          },
+          {
+            "label": "Level of AHU over foundation",
+            "linked": false
+          },
+          {
+            "label": "Fan impeller",
+            "linked": false
+          },
+          {
+            "label": "Fan casing",
+            "linked": false
+          },
+          {
+            "label": "Belt guard check",
+            "linked": false
+          },
+          {
+            "label": "Cooling coil",
+            "linked": false
+          },
+          {
+            "label": "Drain provision",
+            "linked": false
+          },
+          {
+            "label": "Check for foundation, if any",
+            "linked": false
+          },
+          {
+            "label": "Belt size",
+            "linked": false
+          },
+          {
+            "label": "Motor & Fan pulley alignment",
+            "linked": false
+          },
+          {
+            "label": "Flange connection near coil",
+            "linked": false
+          },
+          {
+            "label": "Inspection door / locks",
+            "linked": false
+          },
+          {
+            "label": "Provision for inserting pressure sensor probe : (Filter side)",
+            "linked": false
+          },
+          {
+            "label": "MOTOR DRIVE :",
+            "linked": false
+          },
+          {
+            "label": "Motor capacity",
+            "linked": false
+          },
+          {
+            "label": "Insulation protection class",
+            "linked": false
+          },
+          {
+            "label": "Check for power terminals",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_wiringworks_13",
+    "name": "Wiring works",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Make and quality as per spec.",
+            "linked": false
+          },
+          {
+            "label": "Wires size as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Colour coding as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Any damage to Insulation?",
+            "linked": false
+          },
+          {
+            "label": "Proper identification/ferrules in circuit wires",
+            "linked": false
+          },
+          {
+            "label": "Wires / cables protected properly in switch /power sockets and at DB end",
+            "linked": false
+          },
+          {
+            "label": "Wires are connected with switch & sockets with proper lugs",
+            "linked": false
+          },
+          {
+            "label": "Insulation resistance test carried out(test report attached)",
+            "linked": false
+          },
+          {
+            "label": "Electrical continuity test carried out( test report attached)",
+            "linked": false
+          },
+          {
+            "label": "Earth continuity test carried out (test report attached)",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_switchsocket_14",
+    "name": "Switch socket",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Switch /panel socket location co-ordinated with interior drawing",
+            "linked": false
+          },
+          {
+            "label": "Switch /power sockets height & location as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Switch box/power box fixed properly",
+            "linked": false
+          },
+          {
+            "label": "Conduits terminated in box properly",
+            "linked": false
+          },
+          {
+            "label": "Wires in Switch /power sockets terminated properly",
+            "linked": false
+          },
+          {
+            "label": "Polarity test carried out(test report attached)",
+            "linked": false
+          },
+          {
+            "label": "Functional test carried out(test report attached)",
+            "linked": false
+          },
+          {
+            "label": "Voltage between neutral and ground test carried out(test report attached)",
+            "linked": false
+          },
+          {
+            "label": "Sticker provided",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_panelinstalation_15",
+    "name": "Panel-Instalation",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Availability of approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Panel thoroughly checked & cleaned",
+            "linked": false
+          },
+          {
+            "label": "Panel feeders as per GA drawing",
+            "linked": false
+          },
+          {
+            "label": "Location as per approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Panel aligned properly",
+            "linked": false
+          },
+          {
+            "label": "Panel grouted properly",
+            "linked": false
+          },
+          {
+            "label": "No. of holes in the Gland Plate as per drawing",
+            "linked": false
+          },
+          {
+            "label": "All bus bars of the panel tightened properly",
+            "linked": false
+          },
+          {
+            "label": "Checking of all relays and their settings",
+            "linked": false
+          },
+          {
+            "label": "Earthing connected/slip connected strip",
+            "linked": false
+          },
+          {
+            "label": "All opening sealed properly",
+            "linked": false
+          },
+          {
+            "label": "Rubber mats provided in front of panel",
+            "linked": false
+          },
+          {
+            "label": "Meggering of panel & cables as per range",
+            "linked": false
+          },
+          {
+            "label": "Feeder identification as required",
+            "linked": false
+          },
+          {
+            "label": "Test Reports status",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_ltcabling_16",
+    "name": "LT Cabling",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Physical inspection of insulation",
+            "linked": false
+          },
+          {
+            "label": "Cables are laid as per sizes specified and approved makes",
+            "linked": false
+          },
+          {
+            "label": "Cable dressed properly",
+            "linked": false
+          },
+          {
+            "label": "Cable supported properly",
+            "linked": false
+          },
+          {
+            "label": "Cable clamped /cable tie used",
+            "linked": false
+          },
+          {
+            "label": "Glanding done properly",
+            "linked": false
+          },
+          {
+            "label": "Gland earthing provided",
+            "linked": false
+          },
+          {
+            "label": "Cable tag provided",
+            "linked": false
+          },
+          {
+            "label": "Megger value in acceptable range",
+            "linked": false
+          },
+          {
+            "label": "R-Y CORE",
+            "linked": false
+          },
+          {
+            "label": "R-B CORE",
+            "linked": false
+          },
+          {
+            "label": "Y-B CORE",
+            "linked": false
+          },
+          {
+            "label": "N-E CORE",
+            "linked": false
+          },
+          {
+            "label": "R-E CORE",
+            "linked": false
+          },
+          {
+            "label": "Y- E CORE",
+            "linked": false
+          },
+          {
+            "label": "B- E CORE",
+            "linked": false
+          },
+          {
+            "label": "No bends exceeding the acceptable range",
+            "linked": false
+          },
+          {
+            "label": "Cable free from tension",
+            "linked": false
+          },
+          {
+            "label": "Cable dressed inside Panel",
+            "linked": false
+          },
+          {
+            "label": "Cable tray / raceway laid as per approved drawing.",
+            "linked": false
+          },
+          {
+            "label": "Cable Jack and rollers used for drawing the cable. No twists formed during laying",
+            "linked": false
+          },
+          {
+            "label": "Cable dressed properly on the cable tray, clamps/ cable ties provided at every 900mm max.",
+            "linked": false
+          },
+          {
+            "label": "Adequate bending radius provided.(12d)",
+            "linked": false
+          },
+          {
+            "label": "Cable is supported throughout its length, cable is not hanging loose.",
+            "linked": false
+          },
+          {
+            "label": "Where cable passing through walls or floors ensure GI / PVC sleeve is provided.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_lightfittinginstalling_17",
+    "name": "light fitting - Installing",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Type of fixtures as per approved sample",
+            "linked": false
+          },
+          {
+            "label": "Location as per co-ordination drawing",
+            "linked": false
+          },
+          {
+            "label": "Marking of opening size for concealed light fittings",
+            "linked": false
+          },
+          {
+            "label": "Flexible conduit with adopter provided",
+            "linked": false
+          },
+          {
+            "label": "Wires terminated properly",
+            "linked": false
+          },
+          {
+            "label": "Lighting Control as per approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Light fittings are secured properly",
+            "linked": false
+          },
+          {
+            "label": "Light fittings are clean including inside diffuser",
+            "linked": false
+          },
+          {
+            "label": "Wattage of lamp and colour of lamp (day light / warm light)",
+            "linked": false
+          },
+          {
+            "label": "Check any damage to fixtures",
+            "linked": false
+          },
+          {
+            "label": "Check transformer rating and termination",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_conduiting_18",
+    "name": "conduiting",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Conduit material & size as per specification & approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Conduiting is done as per approved layout drawing.",
+            "linked": false
+          },
+          {
+            "label": "MS conduits coupled with threaded joints only. Conduit joints are threaded properly.",
+            "linked": false
+          },
+          {
+            "label": "Adhesive applied at all joints for PVC conduits.",
+            "linked": false
+          },
+          {
+            "label": "Conduit joints are cleaned and smooth",
+            "linked": false
+          },
+          {
+            "label": "Conduit joints are free from burrs.",
+            "linked": false
+          },
+          {
+            "label": "Conduits are saddled properly (Spacer-saddles provided at every 600mm)",
+            "linked": false
+          },
+          {
+            "label": "Conduits terminates in junction box properly",
+            "linked": false
+          },
+          {
+            "label": "Conduits terminates in switch/socket box with check nut properly",
+            "linked": false
+          },
+          {
+            "label": "End cap/PVC bushings provided and unused openings sealed properly. Unused knockouts of the JBs are closed with rubber bushings",
+            "linked": false
+          },
+          {
+            "label": "Concealed conduits protected against ingress of mortar.",
+            "linked": false
+          },
+          {
+            "label": "Proper line & level maintained.",
+            "linked": false
+          },
+          {
+            "label": "Check nuts provided at the termination of conduits in the junction boxes, switch boxes, DB etc.",
+            "linked": false
+          },
+          {
+            "label": "Conduit joints to Flexible conduits done with coupler",
+            "linked": false
+          },
+          {
+            "label": "Fabricated conduit accessories like, bends JBs couplers used-smooth bends / offsets provided.",
+            "linked": false
+          },
+          {
+            "label": "Continuity test carried out from one end to the other.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_floorraceway_19",
+    "name": "Floor raceway",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Raceway size & material as per approved drawing & sample",
+            "linked": false
+          },
+          {
+            "label": "Layout as per approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Coordinates as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Raceways and JB's are supported properly from ceiling",
+            "linked": false
+          },
+          {
+            "label": "Raceway covers provided, fixed with screws.",
+            "linked": false
+          },
+          {
+            "label": "Junction boxes and ends of raceways protected against ingress of mortar during screeding.",
+            "linked": false
+          },
+          {
+            "label": "Minimum 30mm depth available above the top of raceway cover from the finished screed surface.",
+            "linked": false
+          },
+          {
+            "label": "Junction boxes and ends of raceways protected against ingress of mortar during screeding.",
+            "linked": false
+          },
+          {
+            "label": "Junction boxes are covered with thermacol and tape.",
+            "linked": false
+          },
+          {
+            "label": "Pull wire laid in raceway(for long run only)",
+            "linked": false
+          },
+          {
+            "label": "Raceway terminated/connected with junction box properly",
+            "linked": false
+          },
+          {
+            "label": "All joints sealed as per requirements/specifications",
+            "linked": false
+          },
+          {
+            "label": "Is Raceway cleaned ?",
+            "linked": false
+          },
+          {
+            "label": "Pull wire laid in raceway(for long run only)",
+            "linked": false
+          },
+          {
+            "label": "Measurement sheet enclosed",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_earthing_20",
+    "name": "Earthing",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Size and make as per specification / BOQ",
+            "linked": false
+          },
+          {
+            "label": "Access to earth electrode, test points and main earth bars",
+            "linked": false
+          },
+          {
+            "label": "Type of earth pit (copper / G.I.)",
+            "linked": false
+          },
+          {
+            "label": "Test links installed, connections made to equipments",
+            "linked": false
+          },
+          {
+            "label": "The panels are earthed on both sides using suitable strips",
+            "linked": false
+          },
+          {
+            "label": "Earthing for server room",
+            "linked": false
+          },
+          {
+            "label": "Value of Earth pit",
+            "linked": false
+          },
+          {
+            "label": "Earthing chamber and plate to be properly finished",
+            "linked": false
+          },
+          {
+            "label": "Earthing pit Identifivation is done",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_cabletray_21",
+    "name": "Cable tray",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Cable ladder /tray size & quality of material as per approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Trays installed/ erected as per layout drawing",
+            "linked": false
+          },
+          {
+            "label": "Bottom-of-tray level as per services co-ordination drawing.",
+            "linked": false
+          },
+          {
+            "label": "Grinding done on sharp edges.-all edges are smooth",
+            "linked": false
+          },
+          {
+            "label": "Touch-up paint applied at welding spots.",
+            "linked": false
+          },
+          {
+            "label": "Proper supports to ladder/tray -supports at every 1200mm.",
+            "linked": false
+          },
+          {
+            "label": "All supports in level and plumb-appropriate size of Hitech rod, anchor fastener used",
+            "linked": false
+          },
+          {
+            "label": "All Tees and bends are properly fixed-factory fabricated bends, offsets and accessories used",
+            "linked": false
+          },
+          {
+            "label": "All fish plates are properly fixed/tightened",
+            "linked": false
+          },
+          {
+            "label": "All earthing continuity links are properly fixed/tightened",
+            "linked": false
+          },
+          {
+            "label": "Extra supports cut / removed if any",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_upsinstallation_22",
+    "name": "UPS Installation",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "UPS is installed in level",
+            "linked": false
+          },
+          {
+            "label": "Batteries are connected properly",
+            "linked": false
+          },
+          {
+            "label": "Terminations are done properly",
+            "linked": false
+          },
+          {
+            "label": "Output voltages tested found as under",
+            "linked": false
+          },
+          {
+            "label": "R-Y",
+            "linked": false
+          },
+          {
+            "label": "Y-B",
+            "linked": false
+          },
+          {
+            "label": "B-R",
+            "linked": false
+          },
+          {
+            "label": "R-N",
+            "linked": false
+          },
+          {
+            "label": "Y-N",
+            "linked": false
+          },
+          {
+            "label": "B-N",
+            "linked": false
+          },
+          {
+            "label": "Leakage voltage to earth between E-N",
+            "linked": true
+          },
+          {
+            "label": "Incoming and outgoing connections made properly",
+            "linked": false
+          },
+          {
+            "label": "Display charts are proper",
+            "linked": false
+          },
+          {
+            "label": "Display functions are proper",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_ductinsulation_23",
+    "name": "DUCT INSULATION",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Type of insulation is as per approved specs( Elastomeric foam / Fiber glass )",
+            "linked": false
+          },
+          {
+            "label": "Thickness of the material used",
+            "linked": false
+          },
+          {
+            "label": "Surface of the ducts are cleaned",
+            "linked": false
+          },
+          {
+            "label": "Application of the adhesive",
+            "linked": false
+          },
+          {
+            "label": "Fixing of the insulation without leaving air gaps",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_ducting_24",
+    "name": "DUCTING",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Ducting Material used (GI/ALUMINIUM)",
+            "linked": false
+          },
+          {
+            "label": "Gauge & longest side dimension Confirms to IS 655",
+            "linked": false
+          },
+          {
+            "label": "Quality of Aluminium GI Sheets (Bright/Soiled)",
+            "linked": false
+          },
+          {
+            "label": "Folding (Proper / Improper)",
+            "linked": false
+          },
+          {
+            "label": "Guide Vanes/shoe joints in collars",
+            "linked": false
+          },
+          {
+            "label": "Bracing around ducting",
+            "linked": false
+          },
+          {
+            "label": "Duct supports spacing interval",
+            "linked": false
+          },
+          {
+            "label": "Center distance of rivets/nut bolts of angle flanges not to exceed 150 mm",
+            "linked": false
+          },
+          {
+            "label": "Gasket Thickness",
+            "linked": false
+          },
+          {
+            "label": "Quality of Gasket (Acceptable/Not Acceptable)",
+            "linked": false
+          },
+          {
+            "label": "Fixing of Gasket",
+            "linked": false
+          },
+          {
+            "label": "Galvanizing of MS angle frames",
+            "linked": false
+          },
+          {
+            "label": "Access door for all dampers",
+            "linked": false
+          },
+          {
+            "label": "Layout and Bottom Lvl of the duct as per coordinated services drawing",
+            "linked": false
+          },
+          {
+            "label": "Provision of return air ducts with acoustic Insulation (Noise attenuator)",
+            "linked": false
+          },
+          {
+            "label": "Diffuser plenum hanging with four supports",
+            "linked": false
+          },
+          {
+            "label": "Flexible ducts fixing with round clamps",
+            "linked": false
+          },
+          {
+            "label": "Round butterfly dampers fixing",
+            "linked": false
+          },
+          {
+            "label": "Duct must not cross any beam and column capital.",
+            "linked": false
+          },
+          {
+            "label": "Check routing and slope of drain pipes.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_vavinstallation_25",
+    "name": "VAV INSTALLATION",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "VAVs are installed as per the Drawing & VAV Schedule",
+            "linked": false
+          },
+          {
+            "label": "Duct Acoustic Insulation Immediate after the VAV as per the Drawings",
+            "linked": false
+          },
+          {
+            "label": "Are VAVs installed in Level & supported on Four Sides",
+            "linked": false
+          },
+          {
+            "label": "Is VCD installed before the VAV as per Drawing",
+            "linked": false
+          },
+          {
+            "label": "Check the Direction of - Air Flow",
+            "linked": false
+          },
+          {
+            "label": "VAV's Airflow Sensing Tube is Plugged",
+            "linked": false
+          },
+          {
+            "label": "Thermostat Location & Cabling as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Thermostats are Calibrated",
+            "linked": false
+          },
+          {
+            "label": "DP Sensor Configuration to VFD",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_copperpipelaying_26",
+    "name": "copper pipe laying",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check that pipe Routing is in accordance with approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Check the supports are properly aligned & level",
+            "linked": false
+          },
+          {
+            "label": "Check spacing of supports are correct for pipe size and standard/ spec. reqts.",
+            "linked": false
+          },
+          {
+            "label": "Check copper pipe size as per std/Specs.",
+            "linked": false
+          },
+          {
+            "label": "Check the spacing between joints of the pipe conforms to applicable Std/Specs.",
+            "linked": false
+          },
+          {
+            "label": "Check for Straightness, Leveling, Alingment & Verticality of the pipes.",
+            "linked": false
+          },
+          {
+            "label": "Check for the pipes are protected with cable trays & covers",
+            "linked": false
+          },
+          {
+            "label": "Check all brazed joints are visually satisfactory",
+            "linked": false
+          },
+          {
+            "label": "check surface of the pipes are cleaned",
+            "linked": false
+          },
+          {
+            "label": "Check proper insulation material used",
+            "linked": false
+          },
+          {
+            "label": "Check applicaion of the insulation without leaving air gaps",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_railingworksssms_27",
+    "name": "Railing Works (SS & MS)",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Material grade, thickness, and finish as per approved drawings",
+            "linked": false
+          },
+          {
+            "label": "Fabrication quality – proper welding, grinding, and smooth finish",
+            "linked": false
+          },
+          {
+            "label": "Posts and rails aligned correctly (vertical/horizontal level check)",
+            "linked": false
+          },
+          {
+            "label": "Secure anchoring with correct bolts or chemical anchors",
+            "linked": false
+          },
+          {
+            "label": "Safety compliance – correct height, spacing, and edge protection",
+            "linked": false
+          },
+          {
+            "label": "Surface treatment – polished SS or coated/painted MS to avoid corrosion",
+            "linked": false
+          },
+          {
+            "label": "Accessories (brackets, caps, joints) installed firmly and neatly",
+            "linked": false
+          },
+          {
+            "label": "Cleanliness maintained; weld marks and sharp edges removed",
+            "linked": false
+          },
+          {
+            "label": "Load/stability checked before handover",
+            "linked": false
+          },
+          {
+            "label": "Final inspection completed and client approval documented",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_granitecladdingandflooring_28",
+    "name": "Granite cladding and flooring",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved granite samples",
+            "linked": false
+          },
+          {
+            "label": "Uniformity of color/shade in granite",
+            "linked": false
+          },
+          {
+            "label": "Thickness of granite slabs",
+            "linked": false
+          },
+          {
+            "label": "Evenness of surface",
+            "linked": false
+          },
+          {
+            "label": "Granite size as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Surface preparation before fixing",
+            "linked": false
+          },
+          {
+            "label": "Adhesive/epoxy thickness and application",
+            "linked": false
+          },
+          {
+            "label": "Slopes (if applicable)",
+            "linked": false
+          },
+          {
+            "label": "Pattern alignment and joint matching",
+            "linked": false
+          },
+          {
+            "label": "Joints filling and finishing",
+            "linked": false
+          },
+          {
+            "label": "Hollow areas check",
+            "linked": false
+          },
+          {
+            "label": "Cracks, chips, or damage inspection",
+            "linked": false
+          },
+          {
+            "label": "Level alignment and squareness",
+            "linked": false
+          },
+          {
+            "label": "Cleanliness around fittings and edges",
+            "linked": false
+          },
+          {
+            "label": "Polishing quality",
+            "linked": false
+          },
+          {
+            "label": "Protection during curing by polythene sheet / other methods",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_partitionmarking_29",
+    "name": "Partition Marking",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Drawing No.",
+            "linked": false
+          },
+          {
+            "label": "Latest revision of the drawing",
+            "linked": false
+          },
+          {
+            "label": "Right angle of the partition",
+            "linked": false
+          },
+          {
+            "label": "Inner dimensions of the cabin",
+            "linked": false
+          },
+          {
+            "label": "The marking of partition thickness",
+            "linked": false
+          },
+          {
+            "label": "Reference from the column",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_partition2ndsidegyp_30",
+    "name": "Partition 2nd side gyp",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Light fixtures conduit laying completed",
+            "linked": false
+          },
+          {
+            "label": "Speaker conduit laying completed",
+            "linked": false
+          },
+          {
+            "label": "Volume control conduit laying completed",
+            "linked": false
+          },
+          {
+            "label": "Thermostat conduit laying completed",
+            "linked": false
+          },
+          {
+            "label": "Glasswool/Rockwool fixing completed",
+            "linked": false
+          },
+          {
+            "label": "Glasswool//Rockwool thickness checked",
+            "linked": false
+          },
+          {
+            "label": "Glasswool//Rockwool make checked",
+            "linked": false
+          },
+          {
+            "label": "Provision given for cable tray / conduit above false ceiling",
+            "linked": false
+          },
+          {
+            "label": "Electrical box fixing completed",
+            "linked": false
+          },
+          {
+            "label": "Data / voice cable pulling completed",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_fullglazedpartition_31",
+    "name": "Full glazed partition",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved Shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Dimensions",
+            "linked": false
+          },
+          {
+            "label": "Wooden support on the top",
+            "linked": false
+          },
+          {
+            "label": "Wooden thickness",
+            "linked": false
+          },
+          {
+            "label": "Wooden approved make",
+            "linked": false
+          },
+          {
+            "label": "Partition thickness",
+            "linked": false
+          },
+          {
+            "label": "Glass thickness",
+            "linked": false
+          },
+          {
+            "label": "Glass weather toughened / ordinary",
+            "linked": false
+          },
+          {
+            "label": "Aluminium /sapwood section thickness",
+            "linked": false
+          },
+          {
+            "label": "Laminate / veneer fixing pattern",
+            "linked": false
+          },
+          {
+            "label": "Laminate / Veneer thickness",
+            "linked": false
+          },
+          {
+            "label": "Groove size / thickness",
+            "linked": false
+          },
+          {
+            "label": "Beading fixing",
+            "linked": false
+          },
+          {
+            "label": "Beading thickness",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_pelmat_32",
+    "name": "Pelmat",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Pelmet size, material, and finish as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Level and alignment properly maintained",
+            "linked": false
+          },
+          {
+            "label": "Proper fixing with concealed fasteners",
+            "linked": false
+          },
+          {
+            "label": "Edges finished cleanly, no visible damage",
+            "linked": false
+          },
+          {
+            "label": "Gap and clearance for curtain/blind movement checked",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_tilelayingfloorandwall_33",
+    "name": "Tile laying (Floor and wall)",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Pre-Work Checks",
+        "items": [
+          {
+            "label": "Consultant approval for WMS",
+            "linked": false
+          },
+          {
+            "label": "MEP clearance received",
+            "linked": false
+          },
+          {
+            "label": "Material Inspection (Tiles/Adhesive/Grout)",
+            "linked": false
+          },
+          {
+            "label": "Substrate level, clean, dry",
+            "linked": false
+          },
+          {
+            "label": "Tile layout & reference lines marked",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "During Work",
+        "items": [
+          {
+            "label": "Mixing as per approved ratio (1:1 OPC 53 + 305 chemical)",
+            "linked": false
+          },
+          {
+            "label": "Adhesive applied uniformly with proper trowel",
+            "linked": false
+          },
+          {
+            "label": "Tile alignment checked regularly",
+            "linked": false
+          },
+          {
+            "label": "Level & plumb maintained",
+            "linked": false
+          },
+          {
+            "label": "Joint spacing (2–3 mm) with spacers",
+            "linked": false
+          },
+          {
+            "label": "No hollow sound on tapping",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Post-Work Checks",
+        "items": [
+          {
+            "label": "Proper grouting completed",
+            "linked": false
+          },
+          {
+            "label": "No lippage beyond tolerance",
+            "linked": false
+          },
+          {
+            "label": "No cracks, chips, stains",
+            "linked": false
+          },
+          {
+            "label": "Surface cleaned",
+            "linked": false
+          },
+          {
+            "label": "Protection sheet placed",
+            "linked": false
+          },
+          {
+            "label": "Completion photos taken",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_raisedflooring_34",
+    "name": "Raised flooring",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check the Method Statemet Submitted by the vendor",
+            "linked": false
+          },
+          {
+            "label": "Check the existing concrete has to be cleaned and finished with 400 micron self levellening epoxy coat",
+            "linked": false
+          },
+          {
+            "label": "Check the Markings as per the architectural drawings.",
+            "linked": false
+          },
+          {
+            "label": "Check the size and thickness of tile.",
+            "linked": false
+          },
+          {
+            "label": "Check the raised flooring shall be installed as per tharchitectural drawings.",
+            "linked": false
+          },
+          {
+            "label": "Check the raised flooring system inclusive of under structure designed load",
+            "linked": false
+          },
+          {
+            "label": "Check the thickness of plywood for vertical supports",
+            "linked": false
+          },
+          {
+            "label": "Check the cutouts in flooring tiles for services",
+            "linked": false
+          },
+          {
+            "label": "Check the Adhesives used for laying vinyl floor",
+            "linked": false
+          },
+          {
+            "label": "Check the finshes with anti static laminate / anti static vinyl tile.",
+            "linked": false
+          },
+          {
+            "label": "Check the Seamless joints",
+            "linked": false
+          },
+          {
+            "label": "Check the PVC Trims and soft welding",
+            "linked": false
+          },
+          {
+            "label": "Check the levels and surface after Raised flooring.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_blindsinstallation_35",
+    "name": "Blinds installation",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Type, material, and color as per approved sample",
+            "linked": false
+          },
+          {
+            "label": "Proper alignment and level maintained",
+            "linked": false
+          },
+          {
+            "label": "Smooth opening and closing operation",
+            "linked": false
+          },
+          {
+            "label": "Secure fixing of brackets and supports",
+            "linked": false
+          },
+          {
+            "label": "No physical damage, wrinkles, or stains",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_sanitaryfixturesinstallation_36",
+    "name": "Sanitary fixtures installation",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Fixtures as per approved make and model",
+            "linked": false
+          },
+          {
+            "label": "Alignment and level properly maintained",
+            "linked": false
+          },
+          {
+            "label": "Proper sealing and support at joints",
+            "linked": false
+          },
+          {
+            "label": "No damage, scratches or stains on fixtures",
+            "linked": false
+          },
+          {
+            "label": "Water flow, leakage and drainage tested",
+            "linked": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_wallpapergraphicsinstall_37",
+    "name": "Wallpaper& graphics install",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Material/design as per approved sample",
+            "linked": false
+          },
+          {
+            "label": "Surface cleaned and primed before application",
+            "linked": false
+          },
+          {
+            "label": "Alignment and joint matching maintained",
+            "linked": false
+          },
+          {
+            "label": "No wrinkles, bubbles or edge lifting",
+            "linked": false
+          },
+          {
+            "label": "Neat finishing at corners and terminations",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_factorystorages_38",
+    "name": "Factory storages",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Material, size and type as per approved drawing",
+            "linked": false
+          },
+          {
+            "label": "Proper installation and anchoring to floor/wall",
+            "linked": false
+          },
+          {
+            "label": "Level and vertical alignment checked",
+            "linked": false
+          },
+          {
+            "label": "No sharp edges, dents or paint damage",
+            "linked": false
+          },
+          {
+            "label": "Load-bearing capacity labels/markings fixed",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_acousticpanel_39",
+    "name": "Acoustic panel",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Care to be taken, not to damage the side finishes while installing panels.",
+            "linked": false
+          },
+          {
+            "label": "Panels to be checked for damaged acoustic boards.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_abovebelowceilingcheck_40",
+    "name": "Above & below ceiling check",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — Fire Fighting",
+        "items": [
+          {
+            "label": "Painting of sprinkler main lines header",
+            "linked": false
+          },
+          {
+            "label": "Support of Sprinkler main lines header",
+            "linked": false
+          },
+          {
+            "label": "Painting of sprinkler branch pipe",
+            "linked": false
+          },
+          {
+            "label": "Support of Sprinkler branch pipe lines",
+            "linked": false
+          },
+          {
+            "label": "Check for Adiquate supports",
+            "linked": false
+          },
+          {
+            "label": "Installation of Sprinkler Upright",
+            "linked": false
+          },
+          {
+            "label": "Remove safey clip of Sprinkler Upright",
+            "linked": false
+          },
+          {
+            "label": "Installation of Sprinkler Flexible pendent",
+            "linked": false
+          },
+          {
+            "label": "Remove safey clip of Sprinkler pendent",
+            "linked": false
+          },
+          {
+            "label": "Installation of Smoke detectors",
+            "linked": false
+          },
+          {
+            "label": "Above false ceiling of Smoke detectors protected cover removed",
+            "linked": false
+          },
+          {
+            "label": "Installation of Speaker",
+            "linked": false
+          },
+          {
+            "label": "Installation of response indicator",
+            "linked": false
+          },
+          {
+            "label": "Installation of LED Signages",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — HVAC",
+        "items": [
+          {
+            "label": "Installation of Ducting, insulation, proper supports",
+            "linked": false
+          },
+          {
+            "label": "Installation of VAV units with proper supports.",
+            "linked": false
+          },
+          {
+            "label": "Installation power spur fuse of VAV unit.",
+            "linked": false
+          },
+          {
+            "label": "Installation of VAV cone piece with support",
+            "linked": false
+          },
+          {
+            "label": "Installation of Flexible with supporting",
+            "linked": false
+          },
+          {
+            "label": "Installation of Mixer box & Diffusers.",
+            "linked": false
+          },
+          {
+            "label": "Installation of Mixer box with slot grills.",
+            "linked": false
+          },
+          {
+            "label": "Installation of VAV cabling to VAV integrator with conduits",
+            "linked": false
+          },
+          {
+            "label": "Installation of Thermostat",
+            "linked": false
+          },
+          {
+            "label": "Installation of Z piece / cross",
+            "linked": false
+          },
+          {
+            "label": "Battery room exhaust unit with controls",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — Electrical",
+        "items": [
+          {
+            "label": "Installation of BMS, TMS, Lighting, CCTV, AV, IT trunking including conduits draping.",
+            "linked": false
+          },
+          {
+            "label": "Covers installation of BMS, TMS, Lighting, CCTV, AV, IT trunking with suppots.",
+            "linked": false
+          },
+          {
+            "label": "connecting of earthing wire for all truncking/conduits.",
+            "linked": false
+          },
+          {
+            "label": "Cabling of BMS, TMS, Lighting, CCTV, AV, IT if any",
+            "linked": false
+          },
+          {
+            "label": "Installation of support for Light fixture",
+            "linked": false
+          },
+          {
+            "label": "Installation of Light fixture",
+            "linked": false
+          },
+          {
+            "label": "installation of lighting sensor",
+            "linked": false
+          },
+          {
+            "label": "Emergency light with support",
+            "linked": false
+          },
+          {
+            "label": "Installation of conduits with power points of Roller blends",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — BMS",
+        "items": [
+          {
+            "label": "VAV Units termination",
+            "linked": false
+          },
+          {
+            "label": "Installation cabling of Co2 sensors",
+            "linked": false
+          },
+          {
+            "label": "Installation of Co2 sensors",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — Access control",
+        "items": [
+          {
+            "label": "Check Conduiting location and executed with proper supports",
+            "linked": false
+          },
+          {
+            "label": "Check for Cabling and termination",
+            "linked": false
+          },
+          {
+            "label": "Check for installation of the device",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Above Ceiling checklist before closer of ceiling — AV units",
+        "items": [
+          {
+            "label": "Installation of 100X50MM AV Trunking with support",
+            "linked": false
+          },
+          {
+            "label": "80mm Dia hole for display cable access",
+            "linked": false
+          },
+          {
+            "label": "32 mm conduits from speakers with junction box",
+            "linked": false
+          },
+          {
+            "label": "Installation of Camera conduits",
+            "linked": false
+          },
+          {
+            "label": "40mm dia Hole for camera cable access.",
+            "linked": false
+          },
+          {
+            "label": "Installation of power cables, conduits, sockets etc",
+            "linked": false
+          },
+          {
+            "label": "Installation of conduits with back box of data port.",
+            "linked": false
+          },
+          {
+            "label": "Ceiling speaker conduits with cabling.",
+            "linked": false
+          },
+          {
+            "label": "Installation of Speakers",
+            "linked": false
+          },
+          {
+            "label": "Cabling of speaker, Camera, AV etc",
+            "linked": false
+          },
+          {
+            "label": "Data networking",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Closing of all service penetration around the partitions",
+        "items": [
+          {
+            "label": "Check for above Ceiling partitions are closed using PU foam no gap is visible",
+            "linked": false
+          },
+          {
+            "label": "Check for below Ceiling partition are closed as the specification",
+            "linked": false
+          }
+        ]
+      },
+      {
+        "name": "Below false flooring works before installation of carpet",
+        "items": [
+          {
+            "label": "Innstallation of IT, AV Raceways",
+            "linked": false
+          },
+          {
+            "label": "Innstallation of AV cabling",
+            "linked": false
+          },
+          {
+            "label": "Installation of Networking cabling",
+            "linked": false
+          },
+          {
+            "label": "Installation of power cabling",
+            "linked": false
+          },
+          {
+            "label": "Installation of raceways covers",
+            "linked": false
+          },
+          {
+            "label": "Installation of power socket box",
+            "linked": false
+          },
+          {
+            "label": "Tiles cutout for cabling",
+            "linked": false
+          },
+          {
+            "label": "Cleaning below false flooring",
+            "linked": false
+          },
+          {
+            "label": "Alignment of False flooring",
+            "linked": false
+          },
+          {
+            "label": "Carpet laying",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_initialwaterponding_41",
+    "name": "Initial Water ponding",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Floor Cleaning",
+            "linked": false
+          },
+          {
+            "label": "Penetration/soundness check",
+            "linked": false
+          },
+          {
+            "label": "No.of water proof coating, If yes mention the number also.",
+            "linked": false
+          },
+          {
+            "label": "Floor level check",
+            "linked": false
+          },
+          {
+            "label": "Wall and floor Coving",
+            "linked": false
+          },
+          {
+            "label": "Core cut packing with gunny bag",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_postwaterponding_42",
+    "name": "Post Water ponding",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Observation #01 - After initial water filling",
+            "linked": false
+          },
+          {
+            "label": "Observation #02 - 0hrs - 1 hrs",
+            "linked": false
+          },
+          {
+            "label": "Observation #03 - 1hrs - 12 hrs",
+            "linked": false
+          },
+          {
+            "label": "Observation #04 - 12hrs -24hrs",
+            "linked": false
+          },
+          {
+            "label": "Observation #05 - 24hrs- 48hrs",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_pipeinward_43",
+    "name": "Pipe Inward",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Pipe Material as per Specification and BOQ",
+            "linked": false
+          },
+          {
+            "label": "Pipe Make as per Approval",
+            "linked": false
+          },
+          {
+            "label": "Pipe Thickness as pe Approval",
+            "linked": false
+          },
+          {
+            "label": "Pipe Weight per length as per Approval",
+            "linked": false
+          },
+          {
+            "label": "Shop Drawings approved",
+            "linked": false
+          },
+          {
+            "label": "No waterproofing is damaged",
+            "linked": false
+          },
+          {
+            "label": "No structural member is cut/damaged",
+            "linked": false
+          },
+          {
+            "label": "Layout correct as per shop drawings",
+            "linked": false
+          },
+          {
+            "label": "Tap off points in the installation located accurately",
+            "linked": false
+          },
+          {
+            "label": "Access points in the stacks are accessible",
+            "linked": false
+          },
+          {
+            "label": "Installation clamped at adequate points",
+            "linked": false
+          },
+          {
+            "label": "Jointing with Teflon tape",
+            "linked": false
+          },
+          {
+            "label": "Adequate concrete supports provided to pipes laid flat",
+            "linked": false
+          },
+          {
+            "label": "Pipes painted as per schedule",
+            "linked": false
+          },
+          {
+            "label": "Chases in walls/ ceiling made good",
+            "linked": false
+          },
+          {
+            "label": "Manufacturer's Test certificate Attached",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_pipedrainage_44",
+    "name": "Pipe Drainage",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Pipe Material as per Specification and BOQ",
+            "linked": false
+          },
+          {
+            "label": "Pipe Make as per Approval",
+            "linked": false
+          },
+          {
+            "label": "Pipe Thickness as pe Approval",
+            "linked": false
+          },
+          {
+            "label": "Pipe Weight per length as per Approval",
+            "linked": false
+          },
+          {
+            "label": "Shop Drawings approved",
+            "linked": false
+          },
+          {
+            "label": "No waterproofing is damaged",
+            "linked": false
+          },
+          {
+            "label": "No structural member is cut/damaged",
+            "linked": false
+          },
+          {
+            "label": "Layout correct as per shop drawings",
+            "linked": false
+          },
+          {
+            "label": "Tap off points in the installation located accurately",
+            "linked": false
+          },
+          {
+            "label": "Access points in the stacks are accessible",
+            "linked": false
+          },
+          {
+            "label": "Installation clamped at adequate points",
+            "linked": false
+          },
+          {
+            "label": "Jointing with Teflon tape",
+            "linked": false
+          },
+          {
+            "label": "Adequate concrete supports provided to pipes laid flat",
+            "linked": false
+          },
+          {
+            "label": "Pipes painted as per schedule",
+            "linked": false
+          },
+          {
+            "label": "Chases in walls/ ceiling made good",
+            "linked": false
+          },
+          {
+            "label": "Manufacturer's Test certificate Attached",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_partitionabovefalseceilin_45",
+    "name": "Partition above false ceilin",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Partition fixing on top and bottom",
+            "linked": false
+          },
+          {
+            "label": "Gyp / MDF packing both side",
+            "linked": false
+          },
+          {
+            "label": "Above false ceiling partition frame",
+            "linked": false
+          },
+          {
+            "label": "Above false ceiling partition both side gyp / MDF fixing",
+            "linked": false
+          },
+          {
+            "label": "Gap gyp closing around the conduit",
+            "linked": false
+          },
+          {
+            "label": "Gap closing around the cable tray",
+            "linked": false
+          },
+          {
+            "label": "Gap closing around the duct",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_sealantfilling_46",
+    "name": "Sealant filling",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Top and bottom spandrels fixing",
+            "linked": false
+          },
+          {
+            "label": "Gap between glazing and the slab",
+            "linked": false
+          },
+          {
+            "label": "Glazing channels fixing or not",
+            "linked": false
+          },
+          {
+            "label": "Sealant approved make",
+            "linked": false
+          },
+          {
+            "label": "Sealant color",
+            "linked": false
+          },
+          {
+            "label": "Sealant quality",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_1stsideplyfixing_47",
+    "name": "1st side ply fixing",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved Shop Drawing",
+            "linked": false
+          },
+          {
+            "label": "Aluminium / wood partition",
+            "linked": false
+          },
+          {
+            "label": "Dimensions",
+            "linked": false
+          },
+          {
+            "label": "L clamp screwing",
+            "linked": false
+          },
+          {
+            "label": "Ply approved make",
+            "linked": false
+          },
+          {
+            "label": "Ply wood thickness",
+            "linked": false
+          },
+          {
+            "label": "Screw / nail size",
+            "linked": false
+          },
+          {
+            "label": "Ply joints screwing",
+            "linked": false
+          },
+          {
+            "label": "Ply fixing with proper screws",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_2ndsideplyfixing_48",
+    "name": "2nd side ply fixing",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Ply wood thickness",
+            "linked": false
+          },
+          {
+            "label": "Plywood approved make",
+            "linked": false
+          },
+          {
+            "label": "Screw / nail size",
+            "linked": false
+          },
+          {
+            "label": "Plywood joints screwing",
+            "linked": false
+          },
+          {
+            "label": "Plywood fixing with proper screwing",
+            "linked": false
+          },
+          {
+            "label": "Light fixtures conduit laying",
+            "linked": false
+          },
+          {
+            "label": "Speaker conduit laying",
+            "linked": false
+          },
+          {
+            "label": "Volume control conduit laying",
+            "linked": false
+          },
+          {
+            "label": "Thermostat conduit laying",
+            "linked": false
+          },
+          {
+            "label": "Glass wool fixing",
+            "linked": false
+          },
+          {
+            "label": "Glass wool thickness",
+            "linked": false
+          },
+          {
+            "label": "Glass wool make",
+            "linked": false
+          },
+          {
+            "label": "Provision given for cable tray / conduit above false ceiling",
+            "linked": false
+          },
+          {
+            "label": "Electrical box fixing",
+            "linked": false
+          },
+          {
+            "label": "Data / voice cable pulling",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_laminatefixingontheparti_49",
+    "name": "Laminate fixing on the parti",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Ply / MDF partition in right angle",
+            "linked": false
+          },
+          {
+            "label": "Ply/ MDF partition nail / screw fixing properly",
+            "linked": false
+          },
+          {
+            "label": "Veneer approved make",
+            "linked": false
+          },
+          {
+            "label": "Code no",
+            "linked": false
+          },
+          {
+            "label": "Grains",
+            "linked": false
+          },
+          {
+            "label": "Approved shop drawing",
+            "linked": false
+          },
+          {
+            "label": "Grains matching",
+            "linked": false
+          },
+          {
+            "label": "Veneer polishing",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_laminatepaneling_50",
+    "name": "Laminate paneling",
+    "discipline": "MEP",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Make of the laminate",
+            "linked": false
+          },
+          {
+            "label": "Shade of the laminate",
+            "linked": false
+          },
+          {
+            "label": "Thickness of the laminate",
+            "linked": false
+          },
+          {
+            "label": "Quality of the frames used for the panelling",
+            "linked": false
+          },
+          {
+            "label": "Gap between the frame work for the panelling",
+            "linked": false
+          },
+          {
+            "label": "Hardware(screws etc.) used for the panelling",
+            "linked": false
+          },
+          {
+            "label": "Workmanship of the frame work",
+            "linked": false
+          },
+          {
+            "label": "Thickness of the MDF/ Ply used",
+            "linked": false
+          },
+          {
+            "label": "Quality of the MDF/ Ply used",
+            "linked": false
+          },
+          {
+            "label": "Fixing details of the MDF/ Ply used",
+            "linked": false
+          },
+          {
+            "label": "Adhesive used for fixing the laminate",
+            "linked": false
+          },
+          {
+            "label": "Workmanship of the laminate fixing",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_whiteboardonpartition_51",
+    "name": "Whiteboard on partition",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Quality of the white board",
+            "linked": false
+          },
+          {
+            "label": "Shade of the white board",
+            "linked": false
+          },
+          {
+            "label": "Frame work of the partition",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_1stcoatpaintclean_52",
+    "name": "1st Coat paint clean",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Smooth finish in plastering",
+            "linked": false
+          },
+          {
+            "label": "Application of primer",
+            "linked": false
+          },
+          {
+            "label": "Sanding with sand paper to smoothen lumps or hard surfaces on walls",
+            "linked": false
+          },
+          {
+            "label": "POP",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_painting_53",
+    "name": "painting",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check for Availability of approved shade details and moke up's",
+            "linked": false
+          },
+          {
+            "label": "Check for cleaning of wall& ceiling surface.Is it free from Dead mortar,Dirt,Dust,algae,Grease etc",
+            "linked": false
+          },
+          {
+            "label": "Check for application of putty(mist Coat) to achieve level and uniform surfaces,if required.",
+            "linked": false
+          },
+          {
+            "label": "Check for suitability & safety of scoffolding",
+            "linked": false
+          },
+          {
+            "label": "Check for wetting of surface to be painted",
+            "linked": false
+          },
+          {
+            "label": "Check for mixing of paint with water-Is it as per maufacurer's specifications.",
+            "linked": false
+          },
+          {
+            "label": "Check for proper covering of floor surface and other finished surface to avoid paint stains.",
+            "linked": false
+          },
+          {
+            "label": "Check for consistancy of paint (Colour variation / Viscocity)",
+            "linked": false
+          },
+          {
+            "label": "Check for time interval between two coats",
+            "linked": false
+          },
+          {
+            "label": "Check for no. of coats of paint and thickness.",
+            "linked": false
+          },
+          {
+            "label": "Check for removal of scaffolds and cleaning.",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_popbullmarkingonthecolum_54",
+    "name": "POP bullmarking on the colum",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check with plum from ceiling to flooring wall undulation",
+            "linked": false
+          },
+          {
+            "label": "Mark at mid height of the column from FL",
+            "linked": false
+          },
+          {
+            "label": "If undulation is more than 2cm, Instruct for plastering",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_gridceilingframework2_55",
+    "name": "Grid Ceiling Frame Work (2",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "L angle properly fastened on the true ceiling with specified anchor fasteners",
+            "linked": false
+          },
+          {
+            "label": "All the Frame work materials used as per specs",
+            "linked": false
+          },
+          {
+            "label": "Slotted angle grill areas both sides intermediate support given",
+            "linked": false
+          },
+          {
+            "label": "Vertical ends are properly supported with intermediate and L angle",
+            "linked": false
+          },
+          {
+            "label": "Surface finished as per the required ceiling level",
+            "linked": false
+          },
+          {
+            "label": "The frame is in right angle with wall ( every 2m to be Checked)",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_tilefixingonthegrid_56",
+    "name": "Tile fixing on the grid",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Tiles checked for damages, size, and color uniformity before installation",
+            "linked": false
+          },
+          {
+            "label": "Grid alignment and level verified before tile placement",
+            "linked": false
+          },
+          {
+            "label": "Tiles fixed flush with grid, without gaps or sagging",
+            "linked": false
+          },
+          {
+            "label": "Tile locking clips or edge supports used as required",
+            "linked": false
+          },
+          {
+            "label": "Cut tiles properly trimmed and placed at periphery with neat finish",
+            "linked": false
+          },
+          {
+            "label": "No visible cracks, chips or unevenness after fixing",
+            "linked": false
+          },
+          {
+            "label": "Final cleaning done and surface free from dust or stains",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_glassdoorpartitions_57",
+    "name": "Glass door & partitions",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Glass type, size, and thickness as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Proper alignment and level of glass panels",
+            "linked": false
+          },
+          {
+            "label": "Frosted film applied as per approved design",
+            "linked": false
+          },
+          {
+            "label": "Edges polished and hardware fixed properly",
+            "linked": false
+          },
+          {
+            "label": "Clean finish without scratches or bubbles",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_doors_58",
+    "name": "Doors",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved Shop drawings",
+            "linked": false
+          },
+          {
+            "label": "Section of door frame",
+            "linked": false
+          },
+          {
+            "label": "Size of door frame",
+            "linked": false
+          },
+          {
+            "label": "Fixing of holdfasts",
+            "linked": false
+          },
+          {
+            "label": "Direction of door opening",
+            "linked": false
+          },
+          {
+            "label": "Frame finishing and polishing",
+            "linked": false
+          },
+          {
+            "label": "Groove between door frame and partition",
+            "linked": false
+          },
+          {
+            "label": "Installation of Door with hardwares",
+            "linked": false
+          },
+          {
+            "label": "Checking the door's levels after installation",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_selfleveling_59",
+    "name": "Self leveling",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved material/sample used",
+            "linked": false
+          },
+          {
+            "label": "Surface cleaned & free of dust/debris",
+            "linked": false
+          },
+          {
+            "label": "Primer application checked",
+            "linked": false
+          },
+          {
+            "label": "Substrate moisture within limits",
+            "linked": false
+          },
+          {
+            "label": "Level pegs or gauges fixed",
+            "linked": false
+          },
+          {
+            "label": "Material mixed as per manufacturer’s guidelines",
+            "linked": false
+          },
+          {
+            "label": "Uniform application thickness",
+            "linked": false
+          },
+          {
+            "label": "Smooth and leveled surface achieved",
+            "linked": false
+          },
+          {
+            "label": "Edges finished properly",
+            "linked": false
+          },
+          {
+            "label": "Curing time observed",
+            "linked": false
+          },
+          {
+            "label": "Cracks, undulations checked",
+            "linked": false
+          },
+          {
+            "label": "Cleaning of adjacent areas",
+            "linked": false
+          },
+          {
+            "label": "Clearance from MEP services",
+            "linked": false
+          },
+          {
+            "label": "Ready for next finish layer (Tile/Carpet/etc.)",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_skirting_60",
+    "name": "Skirting",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Material and finish as per approved sample/drawing",
+            "linked": false
+          },
+          {
+            "label": "Fixing alignment, level and joints checked",
+            "linked": false
+          },
+          {
+            "label": "Surface free from damage or scratches",
+            "linked": false
+          },
+          {
+            "label": "Neat edge termination and proper joint treatment",
+            "linked": false
+          },
+          {
+            "label": "Area cleaned and protection provided post-fixing",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_vinyllaying_61",
+    "name": "Vinyl Laying",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Approved samples",
+            "linked": false
+          },
+          {
+            "label": "Approved make of carpet",
+            "linked": false
+          },
+          {
+            "label": "Approved make of adhesives",
+            "linked": false
+          },
+          {
+            "label": "Uniformity of colour / shade in marble",
+            "linked": false
+          },
+          {
+            "label": "Eveness of floor",
+            "linked": false
+          },
+          {
+            "label": "Tile size as per drawing",
+            "linked": false
+          },
+          {
+            "label": "Surface preperation",
+            "linked": false
+          },
+          {
+            "label": "Flooring pattern",
+            "linked": false
+          },
+          {
+            "label": "Joints",
+            "linked": false
+          },
+          {
+            "label": "Cleanliness and finishing near floor junction box",
+            "linked": false
+          },
+          {
+            "label": "Protection by Polythene sheet",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_waterproofing_62",
+    "name": "Water proofing",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "General Inspection",
+            "linked": false
+          },
+          {
+            "label": "Whether area is free of dust and laitance",
+            "linked": false
+          },
+          {
+            "label": "Toilet Waterproofing",
+            "linked": false
+          },
+          {
+            "label": "Whether all concealed water supply and drainage lines are laid, installed and tested prior to applying waterproofing treatment.",
+            "linked": false
+          },
+          {
+            "label": "Ensure that during final installation of sanitary fixtures, the waterproofing is not damaged.",
+            "linked": false
+          },
+          {
+            "label": "Whether repairing to waterproofing is carried out if damaged during installation of fixtures.",
+            "linked": false
+          },
+          {
+            "label": "Whether all joints of sanitary fixtures installed and their sealing are tested for any leakages prior to covering / embedding.",
+            "linked": true
+          },
+          {
+            "label": "Whether efficacy of water tightness and waterproofing is tested by artificial flooding.",
+            "linked": true
+          },
+          {
+            "label": "Terrace Waterproofing",
+            "linked": false
+          },
+          {
+            "label": "Obtain detailed specifications from the agency for waterproofing.",
+            "linked": false
+          },
+          {
+            "label": "Whether the top of surface to receive waterproofing treatment is cleaned of all loose foreign materials, oil and grease.",
+            "linked": false
+          },
+          {
+            "label": "Whether all pipes and sleeves are installed prior to waterproofing.",
+            "linked": false
+          },
+          {
+            "label": "Whether the base course is laid to required slopes.",
+            "linked": false
+          },
+          {
+            "label": "Whether all pipe outlets are installed in position while finishing the treatment.",
+            "linked": false
+          },
+          {
+            "label": "Whether the final finished surface is provided as required.",
+            "linked": false
+          },
+          {
+            "label": "Whether the area is cured properly for required period.",
+            "linked": false
+          },
+          {
+            "label": "Whether the efficacy of the treatment is tested by artificial flooding.",
+            "linked": false
+          },
+          {
+            "label": "Whether the defects are rectified.",
+            "linked": true
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_blockwork_63",
+    "name": "Block work",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Blocks checked for dimensions, cracks, moisture content & compliance with IS 2185 standards",
+            "linked": false
+          },
+          {
+            "label": "Mortar mix ratio verified as per approved specifications (e.g., 1:4 or 1:6 cement:sand)",
+            "linked": false
+          },
+          {
+            "label": "Courses laid in proper level and alignment with uniform mortar thickness (10–12 mm)",
+            "linked": false
+          },
+          {
+            "label": "Vertical joints staggered and properly filled; no continuous vertical joints",
+            "linked": false
+          },
+          {
+            "label": "Curing carried out for minimum 7 days to ensure strength and bonding",
+            "linked": false
+          },
+          {
+            "label": "Openings, inserts, conduits and chases planned and executed without damaging the block integrity",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_blockworkmarking_64",
+    "name": "Block work marking",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Latest revision of the drawing",
+            "linked": false
+          },
+          {
+            "label": "Right angle of the partition is proper from the ref point",
+            "linked": false
+          },
+          {
+            "label": "Inner dimensions of the cabin is proper",
+            "linked": false
+          },
+          {
+            "label": "The marking of partition thickness as per GFC",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_plastering_65",
+    "name": "Plastering",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check for completion of preceding activities like fixing of service conduits, water supply and sanitation lines.",
+            "linked": false
+          },
+          {
+            "label": "Raking of Masonry joints and hacking on RCC surfaces.",
+            "linked": false
+          },
+          {
+            "label": "Check for removal of efflorescent materials.",
+            "linked": false
+          },
+          {
+            "label": "Cleaning and washing of Masonry and RCC surfaces.",
+            "linked": false
+          },
+          {
+            "label": "Check for safety and suitability of scaffolding.",
+            "linked": false
+          },
+          {
+            "label": "Bull marks to be provided as per the thickness specified at intervel of 1.5m for eveness of plastered surface.",
+            "linked": false
+          },
+          {
+            "label": "Check for proper mixing of Mortar.",
+            "linked": false
+          },
+          {
+            "label": "Check for Mortar Mix proportion",
+            "linked": false
+          },
+          {
+            "label": "Check for proper installation of Plaster Mesh.",
+            "linked": false
+          },
+          {
+            "label": "Thickness and number of coats of plastering.",
+            "linked": false
+          },
+          {
+            "label": "Check for true level, right angle, plumb, straight edge, sharp corners.",
+            "linked": false
+          },
+          {
+            "label": "Right angles and Plumb checks.",
+            "linked": false
+          },
+          {
+            "label": "Check for removal of all dead mortar and debris..",
+            "linked": false
+          },
+          {
+            "label": "Curing arrangements",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_popplastering_66",
+    "name": "POP Plastering",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check for the wall where POP is mentioned as per the drawings",
+            "linked": false
+          },
+          {
+            "label": "Check for the dryness of the wall surface",
+            "linked": false
+          },
+          {
+            "label": "Check for the quality of the POP material used.",
+            "linked": false
+          },
+          {
+            "label": "Check for the thickness of the material applied on the wall surface",
+            "linked": false
+          },
+          {
+            "label": "Check for bullmarks with respect to verticality, horizontal, right angle of the POP",
+            "linked": false
+          },
+          {
+            "label": "Check for POP finished surface",
+            "linked": false
+          },
+          {
+            "label": "Check for All jambs and corners with plumb bobs.",
+            "linked": false
+          },
+          {
+            "label": "Check for the make",
+            "linked": false
+          },
+          {
+            "label": "Check for the air gaps",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_screeding_67",
+    "name": "Screeding",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Is the layout marking and floor levels verified?",
+            "linked": false
+          },
+          {
+            "label": "Is the sub base cleaned before taking up the laying of Cinder & Screed?",
+            "linked": false
+          },
+          {
+            "label": "Water proofing membrane Sheet has no damage",
+            "linked": false
+          },
+          {
+            "label": "Are the material grades as per the specifications?",
+            "linked": false
+          },
+          {
+            "label": "Are the plumbing pipeline/conduits are laid as per the requirement?",
+            "linked": false
+          },
+          {
+            "label": "Is the level of pipeline verified?",
+            "linked": false
+          },
+          {
+            "label": "Is the Cinder & Screed laying being done uniformly?",
+            "linked": false
+          },
+          {
+            "label": "Is the mix of the Cinder & Screed as per the specifications?",
+            "linked": false
+          },
+          {
+            "label": "Has the levels of the finished floor been checked before the setting of the Cinder?",
+            "linked": false
+          },
+          {
+            "label": "Is the finished floor being cured adequately?",
+            "linked": false
+          },
+          {
+            "label": "Is the level of the junction boxes in line with the finished floor level?",
+            "linked": false
+          },
+          {
+            "label": "Is the position of output cables and wire entry in place?",
+            "linked": false
+          },
+          {
+            "label": "Has the levels of the finished floor been checked before the setting of the screed?",
+            "linked": false
+          },
+          {
+            "label": "Is the finished floor being cured adequately?",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "qct_aluminiumcladdingwork_68",
+    "name": "Aluminium Cladding Work",
+    "discipline": "C&I",
+    "categories": [
+      {
+        "name": "Checklist",
+        "items": [
+          {
+            "label": "Check for GFC drawing",
+            "linked": false
+          },
+          {
+            "label": "Check for suitability & safety of scaffolding",
+            "linked": false
+          },
+          {
+            "label": "Check for the column/partition in plumb and at right angles",
+            "linked": false
+          },
+          {
+            "label": "Are all the necessary service works complete",
+            "linked": false
+          },
+          {
+            "label": "Check for the levels being maintained while doing cladding",
+            "linked": false
+          },
+          {
+            "label": "Check for the joints between the gypsum / Aluminium or G.I Stud / Wood as per the specifications",
+            "linked": false
+          },
+          {
+            "label": "Check for the correct screwing as per specified",
+            "linked": false
+          }
+        ]
+      }
+    ]
+  }
+]

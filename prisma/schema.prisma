@@ -578,15 +578,28 @@ model QualityInspection {
   result      String
   score       Int     @default(0)
   remarks     String?
+  workType    String?
   sortOrder   Int     @default(0)
 }
 
-// Quality checklist template — items stored as JSON [{ label, linked }].
+// A work-type checklist (e.g. "Tile Laying", "MCB & DB") selectable when starting
+// an inspection. Imported from the SMPL quality-control workbook.
+model QualityChecklistTemplate {
+  id         String                     @id @default(cuid())
+  name       String
+  discipline String
+  categories QualityChecklistCategory[]
+  sortOrder  Int                        @default(0)
+}
+
+// A section within a template — items stored as JSON [{ label, linked }].
 model QualityChecklistCategory {
-  id        String @id @default(cuid())
-  name      String
-  items     Json
-  sortOrder Int    @default(0)
+  id         String                   @id @default(cuid())
+  templateId String
+  template   QualityChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name       String
+  items      Json
+  sortOrder  Int                      @default(0)
 }
 
 model ErpIntegration {
