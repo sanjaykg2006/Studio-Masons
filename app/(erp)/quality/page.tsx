@@ -31,9 +31,12 @@ interface Inspection {
   responses?: InspectionResponseDTO[];
 }
 
-// Constants printed on every downloaded document (from the SMPL template).
-const REPORT_NO = "SMPL/PJ/R07";
-const REV = "01 & 07-10-2024";
+// The inspection report number, auto-generated per report from its sequential
+// ID so each downloaded document carries its own number (SMPL/PJ/R<NN> format).
+const reportNoFor = (insp: Inspection) => {
+  const n = parseInt(insp.id.replace(/\D/g, ""), 10);
+  return `SMPL/PJ/R${isNaN(n) ? insp.id : String(n).padStart(2, "0")}`;
+};
 
 const RESULT_STYLE: Record<Result, string> = {
   Pass:        "bg-green-500/10 text-green-600 border-green-500/20",
@@ -115,7 +118,7 @@ function downloadInspection(insp: Inspection) {
     <tr><td class="lbl">Description of work / BOQ no</td><td colspan="3">${esc(insp.workType || "")}</td></tr>
     <tr><td class="lbl">Drawing no</td><td colspan="3">${esc(insp.drawingNo || "")}</td></tr>
     <tr><td class="lbl">Name of the cabin/location</td><td colspan="3">${esc(insp.area || "")}</td></tr>
-    <tr><td class="lbl">Inspection Report No</td><td>${REPORT_NO}</td><td class="lbl">Rev</td><td>${REV}</td></tr>
+    <tr><td class="lbl">Inspection Report No</td><td colspan="3">${esc(reportNoFor(insp))}</td></tr>
   </table>
   <table class="grid">
     <thead><tr><th>S NO</th><th>Description</th><th>Level 1</th><th>Level 2</th><th>Remarks</th></tr></thead>
@@ -281,6 +284,16 @@ export default function QualityPage() {
     if (!editing) return;
     setInspections(prev => prev.map(x => x.id === editing.id ? { ...x, result: editResult, remarks: editRemarks } : x));
     setEditing(null);
+  }
+
+  function deleteInspection() {
+    if (!editing) return;
+    if (!confirm(`Delete inspection ${editing.id}? This cannot be undone.`)) return;
+    const id = editing.id;
+    setInspections(prev => prev.filter(x => x.id !== id));
+    if (activeId === id) { setActive(null); setActiveId(null); setChecks2([]); }
+    setEditing(null);
+    toast.success("Inspection deleted", `${id} was removed.`);
   }
 
   // ── Template editor ───────────────────────────────────────────
@@ -665,6 +678,10 @@ export default function QualityPage() {
                 <button onClick={() => resumeInspection(editing)}
                   className="px-4 py-2 border border-[#0059a8]/30 text-[#0059a8] rounded font-bold text-[13px] flex items-center gap-2">
                   <span className="material-symbols-outlined" style={{fontSize:"18px"}}>edit</span>Edit Checklist
+                </button>
+                <button onClick={deleteInspection}
+                  className="px-4 py-2 border border-[#ba1a1a]/30 text-[#ba1a1a] rounded font-bold text-[13px] flex items-center gap-2">
+                  <span className="material-symbols-outlined" style={{fontSize:"18px"}}>delete</span>Delete
                 </button>
               </div>
               <div className="flex gap-3">
