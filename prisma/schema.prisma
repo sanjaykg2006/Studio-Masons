@@ -579,6 +579,11 @@ model QualityInspection {
   score       Int     @default(0)
   remarks     String?
   workType    String?
+  contractor  String?
+  drawingNo   String?
+  // Snapshot of the filled checklist at submit time:
+  // [{ name, items: [{ label, linked, level1, level2, na, remarks }] }]
+  responses   Json?
   sortOrder   Int     @default(0)
 }
 

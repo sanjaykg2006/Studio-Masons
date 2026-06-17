@@ -203,12 +203,16 @@ export async function saveScope(list: ScopeDTO[]): Promise<void> {
 }
 
 // ── Quality ───────────────────────────────────────────────────────
-export type InspectionDTO = { id: string; project: string; area: string; category: string; inspector: string; date: string; result: string; score: number; remarks: string; workType: string };
+// A filled checklist item carries the response controls (two inspection levels +
+// not-applicable + remarks) alongside the template label.
+export type InspectionItemDTO = { label: string; linked: boolean; level1: boolean; level2: boolean; na: boolean; remarks: string };
+export type InspectionResponseDTO = { name: string; items: InspectionItemDTO[] };
+export type InspectionDTO = { id: string; project: string; area: string; category: string; inspector: string; date: string; result: string; score: number; remarks: string; workType: string; contractor: string; drawingNo: string; responses: InspectionResponseDTO[] };
 export type QualityChecklistDTO = { name: string; items: { label: string; linked: boolean }[] };
 export type QualityTemplateDTO = { id: string; name: string; discipline: string; categories: QualityChecklistDTO[] };
 export async function loadInspections(): Promise<InspectionDTO[]> {
   const rows = await prisma.qualityInspection.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, project: r.projectName, area: r.area, category: r.category, inspector: r.inspector, date: r.date, result: r.result, score: r.score, remarks: r.remarks ?? "", workType: r.workType ?? "" }));
+  return rows.map((r) => ({ id: r.id, project: r.projectName, area: r.area, category: r.category, inspector: r.inspector, date: r.date, result: r.result, score: r.score, remarks: r.remarks ?? "", workType: r.workType ?? "", contractor: r.contractor ?? "", drawingNo: r.drawingNo ?? "", responses: (r.responses as InspectionResponseDTO[] | null) ?? [] }));
 }
 // Work-type checklists with their sections, ordered by discipline then name.
 export async function loadQualityTemplates(): Promise<QualityTemplateDTO[]> {
@@ -226,8 +230,30 @@ export async function loadQualityTemplates(): Promise<QualityTemplateDTO[]> {
 export async function saveInspections(list: InspectionDTO[]): Promise<void> {
   await prisma.$transaction([
     prisma.qualityInspection.deleteMany({}),
-    prisma.qualityInspection.createMany({ data: list.map((q, i) => ({ id: q.id, projectName: q.project, area: q.area, category: q.category, inspector: q.inspector, date: q.date, result: q.result, score: q.score, remarks: q.remarks ?? "", workType: q.workType || "", sortOrder: i })) }),
+    prisma.qualityInspection.createMany({ data: list.map((q, i) => ({ id: q.id, projectName: q.project, area: q.area, category: q.category, inspector: q.inspector, date: q.date, result: q.result, score: q.score, remarks: q.remarks ?? "", workType: q.workType || "", contractor: q.contractor || "", drawingNo: q.drawingNo || "", responses: q.responses ?? [], sortOrder: i })) }),
   ]);
+}
+
+// ── Quality checklist template editing ────────────────────────────
+export async function createQualityTemplate(input: { name: string; discipline: string }): Promise<QualityTemplateDTO> {
+  const count = await prisma.qualityChecklistTemplate.count();
+  const t = await prisma.qualityChecklistTemplate.create({
+    data: { name: input.name, discipline: input.discipline, sortOrder: count },
+  });
+  return { id: t.id, name: t.name, discipline: t.discipline, categories: [] };
+}
+// Replace a template's name/discipline and rewrite all of its sections in place.
+export async function updateQualityTemplate(tpl: QualityTemplateDTO): Promise<void> {
+  await prisma.$transaction([
+    prisma.qualityChecklistTemplate.update({ where: { id: tpl.id }, data: { name: tpl.name, discipline: tpl.discipline } }),
+    prisma.qualityChecklistCategory.deleteMany({ where: { templateId: tpl.id } }),
+    prisma.qualityChecklistCategory.createMany({
+      data: tpl.categories.map((c, i) => ({ templateId: tpl.id, name: c.name, items: c.items, sortOrder: i })),
+    }),
+  ]);
+}
+export async function deleteQualityTemplate(id: string): Promise<void> {
+  await prisma.qualityChecklistTemplate.delete({ where: { id } });
 }
 
 // ── ERP integration ───────────────────────────────────────────────
