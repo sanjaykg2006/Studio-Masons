@@ -60,7 +60,7 @@ function confirmLink(siteUrl: string, tokenHash: string, type: "invite" | "recov
   return `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=${type}&next=${encodeURIComponent("/set-password")}`;
 }
 
-export type InviteResult = { ok: true } | { ok: false; error: string };
+export type InviteResult = { ok: true; link?: string } | { ok: false; error: string };
 
 // Admin-only: sends a Supabase invite email and provisions the matching Prisma
 // User row (with role). The invited user clicks the email link, which hits
@@ -103,7 +103,25 @@ export async function inviteUser(formData: FormData): Promise<InviteResult> {
     data: { supabaseId: data.user.id, email, name, role },
   });
 
-  return { ok: true };
+  // Supabase's email delivery is best-effort (shared SMTP is rate-limited and
+  // often blocked by recipient domains), so the invite email may never arrive.
+  // Also generate a registration link the admin can share directly through any
+  // channel — this makes the invite work regardless of email deliverability.
+  let link: string | undefined;
+  try {
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo: `${siteUrl}/auth/confirm?type=recovery&next=/set-password` },
+    });
+    if (!linkErr && linkData.properties) {
+      link = confirmLink(siteUrl, linkData.properties.hashed_token, "recovery");
+    }
+  } catch {
+    // Link generation is a convenience on top of the email; ignore failures.
+  }
+
+  return { ok: true, link };
 }
 
 export type LinkResult = { ok: true; link: string } | { ok: false; error: string };

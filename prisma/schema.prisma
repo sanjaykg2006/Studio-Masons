@@ -168,6 +168,8 @@ model PurchaseOrder {
   quotationDate      String?
   vendorAddress      String?
   vendorGstin        String?
+  // Which Studio Masons GST branch the PO is billed from (see BILLING_BRANCHES).
+  billingBranchId    String?
   commencement       String?
   completion         String?
   paymentTerms       String[]

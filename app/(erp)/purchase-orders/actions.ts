@@ -29,6 +29,7 @@ export type PORecord = {
   quotationDate: string | null;
   vendorAddress: string | null;
   vendorGstin: string | null;
+  billingBranchId: string | null;
   commencement: string | null;
   completion: string | null;
   paymentTerms: string[];
@@ -64,6 +65,7 @@ function toRecord(po: POWithLines): PORecord {
     quotationDate: po.quotationDate,
     vendorAddress: po.vendorAddress,
     vendorGstin: po.vendorGstin,
+    billingBranchId: po.billingBranchId,
     commencement: po.commencement,
     completion: po.completion,
     paymentTerms: po.paymentTerms ?? [],
@@ -121,6 +123,7 @@ export type SavePOInput = {
   quotationDate?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  billingBranchId?: string;
   commencement?: string;
   completion?: string;
   paymentTerms?: string[];
@@ -142,6 +145,7 @@ function detailData(input: SavePOInput) {
     quotationDate: input.quotationDate ?? null,
     vendorAddress: input.vendorAddress ?? null,
     vendorGstin: input.vendorGstin ?? null,
+    billingBranchId: input.billingBranchId ?? null,
     commencement: input.commencement ?? null,
     completion: input.completion ?? null,
     paymentTerms: input.paymentTerms ?? [],

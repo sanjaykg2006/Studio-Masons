@@ -83,6 +83,7 @@ export interface PoDocData {
   subject?: string;
   quotationRef?: string;
   quotationDate?: string;  // ISO yyyy-mm-dd
+  billingLines?: string[]; // issuer billing block (selected GST branch); defaults to head office
   notes?: Record<string, string>;        // editable page-1 note texts (keys "1".."11")
   paymentTermsLines?: string[];          // typed page-1 payment terms (note 5 a/b/c…)
   lines: PricedLine[];
@@ -187,7 +188,7 @@ export async function generatePoPdf(d: PoDocData) {
 
   const vendorLines = (d.vendorAddress || "").split(/\r?\n|,/).map((s) => s.trim()).filter(Boolean);
   const yL = renderParty(colL, "To:", d.vendorName, vendorLines, d.vendorGstin);
-  const yR = renderParty(colR, "Billing address:", STUDIO_MASONS.name, STUDIO_MASONS.billingLines);
+  const yR = renderParty(colR, "Billing address:", STUDIO_MASONS.name, d.billingLines ?? STUDIO_MASONS.billingLines);
   ty = Math.max(yL, yR) + 6;
 
   // ── Subject / reference ──────────────────────────────────

@@ -55,6 +55,7 @@ export interface VendorPO {
   quotationDate?: string | null;
   vendorAddress?: string | null;
   vendorGstin?: string | null;
+  billingBranchId?: string | null;
   commencement?: string | null;
   completion?: string | null;
   paymentTerms?: string[];
@@ -114,6 +115,7 @@ export interface AddVendorPOInput {
   quotationDate?: string;
   vendorAddress?: string;
   vendorGstin?: string;
+  billingBranchId?: string;
   commencement?: string;
   completion?: string;
   paymentTerms?: string[];
@@ -308,6 +310,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       quotationDate: input.quotationDate,
       vendorAddress: input.vendorAddress,
       vendorGstin: input.vendorGstin,
+      billingBranchId: input.billingBranchId,
       commencement: input.commencement,
       completion: input.completion,
       paymentTerms: input.paymentTerms,

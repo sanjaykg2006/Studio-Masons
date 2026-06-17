@@ -56,6 +56,9 @@ export default function SettingsPage() {
 
   const [showInvite, setShowInvite] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Registration link returned by the last invite — shown so the admin can share
+  // it directly when the invite email doesn't get delivered.
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [inviting, startInvite] = useTransition();
 
   const [me, setMe] = useState<Profile | null>(null);
@@ -99,10 +102,17 @@ export default function SettingsPage() {
 
   function handleInvite(formData: FormData) {
     setInviteMsg(null);
+    setInviteLink(null);
     startInvite(async () => {
       const res = await inviteUser(formData);
       if (res.ok) {
-        setInviteMsg({ ok: true, text: "Invitation email sent." });
+        setInviteMsg({
+          ok: true,
+          text: res.link
+            ? "Invite created. The email may take a few minutes — if it doesn’t arrive, copy the registration link below and send it to them directly."
+            : "Invitation email sent.",
+        });
+        setInviteLink(res.link ?? null);
         setShowInvite(false);
         listTeam().then(setTeam);
       } else {
@@ -291,13 +301,22 @@ export default function SettingsPage() {
         <div>
           <div className="flex justify-between items-center mb-6">
             <p className="text-[#666666]">{team.length} member{team.length !== 1 ? "s" : ""} in your workspace</p>
-            <button onClick={() => { setInviteMsg(null); setShowInvite(true); }} className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
+            <button onClick={() => { setInviteMsg(null); setInviteLink(null); setShowInvite(true); }} className="bg-[#e30613] text-white px-5 py-2 rounded font-bold text-[13px] flex items-center gap-2 hover:opacity-90 shadow-sm">
               <span className="material-symbols-outlined" style={{fontSize:"18px"}}>person_add</span> INVITE MEMBER
             </button>
           </div>
           {inviteMsg && (
             <div className={`mb-6 text-[13px] rounded p-3 border ${inviteMsg.ok ? "bg-green-500/10 border-green-500/20 text-green-700" : "bg-[#e30613]/10 border-[#e30613]/20 text-[#ba1a1a]"}`}>
               {inviteMsg.text}
+            </div>
+          )}
+          {inviteLink && (
+            <div className="mb-6 rounded p-3 border bg-[#f8f8f8] border-[#e4e2e1]">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[#666666] mb-2">Registration link</p>
+              <div className="flex gap-2">
+                <input readOnly value={inviteLink} onFocus={(e) => e.target.select()} className="flex-1 bg-white border border-[#e4e2e1] rounded px-3 py-2 text-[13px] text-[#333333] focus:outline-none focus:border-[#e30613]" />
+                <button onClick={() => { copyLink(inviteLink); setInviteMsg({ ok: true, text: "Registration link copied to clipboard." }); }} className="px-4 py-2 bg-[#e30613] text-white rounded text-[13px] font-bold hover:opacity-90 shadow-sm whitespace-nowrap">COPY LINK</button>
+              </div>
             </div>
           )}
           <div className="bg-white border border-[#e4e2e1] rounded-xl overflow-hidden shadow-sm">
@@ -561,7 +580,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[13px] font-bold text-[#e30613] uppercase">Company Email</label>
-                <input name="email" type="email" required className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" placeholder="jane@studiomasons.in" />
+                <input name="email" type="email" required className="bg-white border border-[#e4e2e1] rounded p-2.5 text-[15px] focus:outline-none focus:border-[#e30613]" placeholder="shruthi@studio-masons.com" />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-[13px] font-bold text-[#e30613] uppercase">Role</label>

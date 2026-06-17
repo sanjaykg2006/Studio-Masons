@@ -5,7 +5,7 @@ import { useToast } from "@/lib/toast";
 import { PoLinesEditor, buildPoLines, inr, emptyLine, type DraftLine } from "./PoLinesEditor";
 import { parseBoqFile } from "./boqParser";
 import { generatePoPdf } from "./poDocument";
-import { DEFAULT_PAYMENT_TERMS, DEFAULT_NOTES, NOTE_ORDER, NOTE_LABELS, variableRemarkRows } from "./poTerms";
+import { DEFAULT_PAYMENT_TERMS, DEFAULT_NOTES, NOTE_ORDER, NOTE_LABELS, variableRemarkRows, BILLING_BRANCHES, DEFAULT_BILLING_BRANCH_ID, billingBranch } from "./poTerms";
 
 const VARIABLE_ROWS = variableRemarkRows();
 const initialRemarks = () => Object.fromEntries(VARIABLE_ROWS.map((r) => [r.sl, r.defaultRemark]));
@@ -47,6 +47,8 @@ export default function PurchaseOrdersPage() {
   // Extra details that appear on the generated PO document (not persisted — they
   // shape the PDF only). Defaults match the Studio Masons template.
   const [showDetails, setShowDetails] = useState(false);
+  // Which Studio Masons GST branch the PO is billed from (head office by default).
+  const [billingBranchId, setBillingBranchId] = useState(DEFAULT_BILLING_BRANCH_ID);
   const [subject, setSubject] = useState("");
   const [quotationRef, setQuotationRef] = useState("");
   const [quotationDate, setQuotationDate] = useState("");
@@ -102,6 +104,7 @@ export default function PurchaseOrdersPage() {
     setVendorName(""); setPoNumber("");
     setFixedContract(false); setContractStart(""); setContractEnd("");
     setLines([{ ...emptyLine }]);
+    setBillingBranchId(DEFAULT_BILLING_BRANCH_ID);
     setSubject(""); setQuotationRef(""); setQuotationDate("");
     setVendorAddress(""); setVendorGstin(""); setCommencement(""); setCompletion("");
     setNotes({ ...DEFAULT_NOTES });
@@ -122,6 +125,7 @@ export default function PurchaseOrdersPage() {
     setQuotationDate(po.quotationDate ?? "");
     setVendorAddress(po.vendorAddress ?? "");
     setVendorGstin(po.vendorGstin ?? "");
+    setBillingBranchId(po.billingBranchId ?? DEFAULT_BILLING_BRANCH_ID);
     setCommencement(po.commencement ?? "");
     setCompletion(po.completion ?? "");
     setNotes({ ...DEFAULT_NOTES, ...(po.notes ?? {}) });
@@ -220,6 +224,7 @@ export default function PurchaseOrdersPage() {
       quotationDate,
       vendorAddress: vendorAddress.trim(),
       vendorGstin: vendorGstin.trim(),
+      billingBranchId,
       commencement,
       completion,
       paymentTerms: paymentTermsLines,
@@ -244,6 +249,7 @@ export default function PurchaseOrdersPage() {
       subject: subject.trim(),
       quotationRef: quotationRef.trim(),
       quotationDate,
+      billingLines: billingBranch(billingBranchId).billingLines,
       notes,
       paymentTermsLines,
       lines: poLines,
@@ -356,6 +362,14 @@ export default function PurchaseOrdersPage() {
 
           {showDetails && (
             <div style={sectionBox}>
+              <div>
+                <ReqLabel>Billing address (GST branch)</ReqLabel>
+                <select value={billingBranchId} onChange={(e) => setBillingBranchId(e.target.value)} style={inputStyle}>
+                  {BILLING_BRANCHES.map((b) => (
+                    <option key={b.id} value={b.id}>{b.label} · {b.gstin}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <ReqLabel>Subject</ReqLabel>
                 <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={`Purchase order for ${selectedProject.name}`} style={inputStyle} />
@@ -538,6 +552,7 @@ export default function PurchaseOrdersPage() {
                           location: selectedProject.location,
                           vendorName: po.vendorName,
                           subject: `Purchase order for ${po.projectName ?? selectedProject.name}`,
+                          billingLines: billingBranch(po.billingBranchId ?? undefined).billingLines,
                           lines: po.lines!,
                           poValue: po.poValue,
                           commencement: po.contractStart,
