@@ -669,24 +669,24 @@ export default function QualityPage() {
                 <textarea value={editRemarks} onChange={e => setEditRemarks(e.target.value)} rows={3} placeholder="Inspection remarks…" className={inputCls + " resize-none font-[inherit]"} />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex justify-between items-center gap-3 shrink-0">
-              <div className="flex gap-2">
+            <div className="px-6 py-4 border-t border-[#e4e2e1] bg-[#f8f8f8] flex flex-wrap justify-between items-center gap-2 shrink-0">
+              <div className="flex flex-wrap gap-2">
                 <button onClick={() => downloadInspection({ ...editing, remarks: editRemarks, result: editResult })}
-                  className="px-4 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px] flex items-center gap-2">
+                  className="px-3 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px] flex items-center gap-1.5 whitespace-nowrap">
                   <span className="material-symbols-outlined" style={{fontSize:"18px"}}>download</span>Download
                 </button>
                 <button onClick={() => resumeInspection(editing)}
-                  className="px-4 py-2 border border-[#0059a8]/30 text-[#0059a8] rounded font-bold text-[13px] flex items-center gap-2">
+                  className="px-3 py-2 border border-[#0059a8]/30 text-[#0059a8] rounded font-bold text-[13px] flex items-center gap-1.5 whitespace-nowrap">
                   <span className="material-symbols-outlined" style={{fontSize:"18px"}}>edit</span>Edit Checklist
                 </button>
                 <button onClick={deleteInspection}
-                  className="px-4 py-2 border border-[#ba1a1a]/30 text-[#ba1a1a] rounded font-bold text-[13px] flex items-center gap-2">
+                  className="px-3 py-2 border border-[#ba1a1a]/30 text-[#ba1a1a] rounded font-bold text-[13px] flex items-center gap-1.5 whitespace-nowrap">
                   <span className="material-symbols-outlined" style={{fontSize:"18px"}}>delete</span>Delete
                 </button>
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => setEditing(null)} className="px-5 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px]">Cancel</button>
-                <button onClick={saveEdit} className="px-6 py-2 rounded text-white font-bold text-[13px]" style={{background:"#16a34a"}}>Save Changes</button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setEditing(null)} className="px-4 py-2 border border-[#e4e2e1] rounded bg-white text-[#333333] font-bold text-[13px] whitespace-nowrap">Cancel</button>
+                <button onClick={saveEdit} className="px-5 py-2 rounded text-white font-bold text-[13px] whitespace-nowrap" style={{background:"#16a34a"}}>Save Changes</button>
               </div>
             </div>
           </div>
