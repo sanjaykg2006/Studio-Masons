@@ -63,6 +63,7 @@ export async function saveActivities(list: ActivityDTO[]): Promise<void> {
 // ── Snags ─────────────────────────────────────────────────────────
 const SNAG_PRIORITY_STYLE: Record<string, string> = {
   "HIGH PRIORITY": "bg-error/10 text-error border-error/20",
+  HIGH: "bg-error/10 text-error border-error/20",
   MEDIUM: "bg-yellow-600/10 text-yellow-600 border-yellow-600/20",
   LOW: "bg-[#666666]/10 text-[#666666] border-[#666666]/20",
 };
@@ -70,15 +71,48 @@ const SNAG_STATUS_STYLE: Record<string, string> = {
   OPEN: "bg-primary/10 text-primary border-primary/20",
   CLOSED: "bg-surface-container-highest text-[#666666] border-surface-container-highest",
 };
-export type SnagDTO = { id: string; project: string; title: string; priority: string; priorityStyle: string; status: string; statusStyle: string; desc: string; assignee: string; time: string; closed: boolean; accent: boolean };
+export type SnagDTO = { id: string; project: string; title: string; category: string; priority: string; priorityStyle: string; status: string; statusStyle: string; desc: string; assignee: string; time: string; evidenceName: string | null; evidenceUrl: string | null; closed: boolean; accent: boolean };
 export async function loadSnags(): Promise<SnagDTO[]> {
   const rows = await prisma.snagEntry.findMany({ orderBy: { sortOrder: "asc" } });
   return rows.map((r) => ({
-    id: r.id, project: r.projectName, title: r.title,
+    id: r.id, project: r.projectName, title: r.title, category: r.category,
     priority: r.priority, priorityStyle: SNAG_PRIORITY_STYLE[r.priority] ?? SNAG_PRIORITY_STYLE.MEDIUM,
     status: r.status, statusStyle: SNAG_STATUS_STYLE[r.status] ?? SNAG_STATUS_STYLE.OPEN,
-    desc: r.description, assignee: r.assignee, time: r.displayTime, closed: r.closed, accent: r.accent,
+    desc: r.description, assignee: r.assignee, time: r.displayTime,
+    evidenceName: r.evidenceName, evidenceUrl: r.evidenceUrl, closed: r.closed, accent: r.accent,
   }));
+}
+// Raise a new snag and persist it. The evidence image is stored as a (downscaled)
+// data URL produced client-side so the photo survives reloads without object storage.
+export type CreateSnagInput = { project: string; title: string; category: string; priority: string; description: string; assignee: string; evidenceName: string; evidenceUrl: string };
+export async function createSnag(input: CreateSnagInput): Promise<SnagDTO> {
+  const max = await prisma.snagEntry.aggregate({ _max: { sortOrder: true } });
+  const id = `#SN-${Math.floor(100 + Math.random() * 900)}-${Date.now().toString().slice(-4)}`;
+  const row = await prisma.snagEntry.create({
+    data: {
+      id,
+      projectName: input.project,
+      title: input.title.trim(),
+      category: input.category,
+      priority: input.priority,
+      status: "OPEN",
+      description: input.description.trim(),
+      assignee: input.assignee,
+      displayTime: "JUST NOW",
+      evidenceName: input.evidenceName,
+      evidenceUrl: input.evidenceUrl,
+      accent: input.priority === "HIGH",
+      closed: false,
+      sortOrder: (max._max.sortOrder ?? 0) + 1,
+    },
+  });
+  return {
+    id: row.id, project: row.projectName, title: row.title, category: row.category,
+    priority: row.priority, priorityStyle: SNAG_PRIORITY_STYLE[row.priority] ?? SNAG_PRIORITY_STYLE.MEDIUM,
+    status: row.status, statusStyle: SNAG_STATUS_STYLE[row.status] ?? SNAG_STATUS_STYLE.OPEN,
+    desc: row.description, assignee: row.assignee, time: row.displayTime,
+    evidenceName: row.evidenceName, evidenceUrl: row.evidenceUrl, closed: row.closed, accent: row.accent,
+  };
 }
 
 // ── Design docs ───────────────────────────────────────────────────

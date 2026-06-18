@@ -441,18 +441,21 @@ model ActivityEntry {
 }
 
 model SnagEntry {
-  id          String   @id
-  projectName String
-  title       String
-  priority    String
-  status      String
-  description String
-  assignee    String
-  displayTime String
-  accent      Boolean  @default(false)
-  closed      Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id
+  projectName  String
+  title        String
+  category     String   @default("Civil & Structure")
+  priority     String
+  status       String
+  description  String
+  assignee     String
+  displayTime  String
+  evidenceName String?
+  evidenceUrl  String?  @db.Text
+  accent       Boolean  @default(false)
+  closed       Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
 }
 
 model DesignDoc {
