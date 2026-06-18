@@ -114,6 +114,34 @@ export async function createSnag(input: CreateSnagInput): Promise<SnagDTO> {
     evidenceName: row.evidenceName, evidenceUrl: row.evidenceUrl, closed: row.closed, accent: row.accent,
   };
 }
+// Resolve / reopen a snag. Closing flips the status to CLOSED and stamps a resolved
+// label; reopening returns it to OPEN. Returns the updated, page-ready row.
+export async function setSnagClosed(id: string, closed: boolean): Promise<SnagDTO> {
+  const row = await prisma.snagEntry.update({
+    where: { id },
+    data: { closed, status: closed ? "CLOSED" : "OPEN", displayTime: closed ? "RESOLVED JUST NOW" : "REOPENED JUST NOW" },
+  });
+  return {
+    id: row.id, project: row.projectName, title: row.title, category: row.category,
+    priority: row.priority, priorityStyle: SNAG_PRIORITY_STYLE[row.priority] ?? SNAG_PRIORITY_STYLE.MEDIUM,
+    status: row.status, statusStyle: SNAG_STATUS_STYLE[row.status] ?? SNAG_STATUS_STYLE.OPEN,
+    desc: row.description, assignee: row.assignee, time: row.displayTime,
+    evidenceName: row.evidenceName, evidenceUrl: row.evidenceUrl, closed: row.closed, accent: row.accent,
+  };
+}
+
+// ── Snag comments (per-snag communication thread) ─────────────────
+export type SnagCommentDTO = { id: string; snagId: string; author: string; text: string; at: string };
+export async function loadSnagComments(snagId: string): Promise<SnagCommentDTO[]> {
+  const rows = await prisma.snagComment.findMany({ where: { snagId }, orderBy: { createdAt: "asc" } });
+  return rows.map((r) => ({ id: r.id, snagId: r.snagId, author: r.author, text: r.text, at: r.createdAt.toISOString() }));
+}
+export async function addSnagComment(input: { snagId: string; author: string; text: string }): Promise<SnagCommentDTO> {
+  const row = await prisma.snagComment.create({
+    data: { id: `cmt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, snagId: input.snagId, author: input.author, text: input.text.trim() },
+  });
+  return { id: row.id, snagId: row.snagId, author: row.author, text: row.text, at: row.createdAt.toISOString() };
+}
 
 // ── Design docs ───────────────────────────────────────────────────
 export type DesignDocDTO = { id: string; icon: string; name: string; meta: string; by: string; date: string; status: string; feedback: string };

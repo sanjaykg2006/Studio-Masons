@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useProject } from "../../../contexts/ProjectContext";
-import { loadSnags, createSnag, type SnagDTO } from "../data";
+import { loadSnags, createSnag, setSnagClosed, loadSnagComments, addSnagComment, type SnagDTO, type SnagCommentDTO } from "../data";
 
 // Work packages snags are segregated under. These mirror the category dropdown
 // in the raise-snag form so every snag lands in exactly one package section.
@@ -51,9 +51,65 @@ export default function SnagsPage() {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Snag detail / communication state ────────────────────────────
+  const [activeSnag, setActiveSnag] = useState<SnagDTO | null>(null);
+  const [comments, setComments] = useState<SnagCommentDTO[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [resolving, setResolving] = useState(false);
+
   useEffect(() => {
     loadSnags().then(setAllSnags).catch((err) => console.warn("[Snags] load failed:", err));
   }, []);
+
+  function openSnag(s: SnagDTO) {
+    setActiveSnag(s);
+    setComments([]);
+    setCommentText("");
+    setCommentsLoading(true);
+    loadSnagComments(s.id)
+      .then(setComments)
+      .catch((err) => console.warn("[Snags] comments load failed:", err))
+      .finally(() => setCommentsLoading(false));
+  }
+
+  async function handlePostComment() {
+    if (!activeSnag || commentText.trim() === "") return;
+    setPosting(true);
+    try {
+      const c = await addSnagComment({ snagId: activeSnag.id, author: "You", text: commentText });
+      setComments(prev => [...prev, c]);
+      setCommentText("");
+    } catch (err) {
+      console.warn("[Snags] comment post failed:", err);
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function handleToggleResolved() {
+    if (!activeSnag) return;
+    setResolving(true);
+    const nextClosed = !activeSnag.closed;
+    try {
+      const updated = await setSnagClosed(activeSnag.id, nextClosed);
+      setAllSnags(prev => prev.map(s => s.id === updated.id ? updated : s));
+      setActiveSnag(updated);
+      logActivity({
+        icon: nextClosed ? "check_circle" : "report_problem",
+        color: nextClosed ? "#16a34a" : "#e30613",
+        route: "/snags",
+        text: nextClosed ? "Snag resolved in" : "Snag reopened in",
+        bold: updated.project,
+        detail: `${updated.title} (${updated.category}) was marked ${nextClosed ? "resolved" : "open"}.`,
+      });
+    } catch (err) {
+      console.warn("[Snags] resolve toggle failed:", err);
+    } finally {
+      setResolving(false);
+    }
+  }
 
   const snags = selectedProject
     ? allSnags.filter(s => s.project === selectedProject.name)
@@ -234,7 +290,7 @@ export default function SnagsPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                   {group.map((s) => (
-                    <div key={s.id} className={`bg-[#f8f8f8] border border-surface-container-highest rounded p-5 relative group hover:border-primary/40 transition-all shadow-sm ${s.closed ? "opacity-80" : ""}`}>
+                    <div key={s.id} onClick={() => openSnag(s)} className={`bg-[#f8f8f8] border border-surface-container-highest rounded p-5 relative group hover:border-primary/40 transition-all shadow-sm cursor-pointer ${s.closed ? "opacity-80" : ""}`}>
                       {s.accent && <div className="absolute top-0 left-0 w-[2px] h-12 bg-primary" />}
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -358,6 +414,94 @@ export default function SnagsPage() {
               <button onClick={closeModal} className="px-6 py-2 rounded border border-surface-container-highest text-[#333333] hover:bg-surface-container-high font-bold transition-all">CANCEL</button>
               <button onClick={handleRaise} disabled={!isValid || submitting} className="bg-primary text-white px-8 py-2 rounded font-bold hover:opacity-90 active:scale-95 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100">
                 {submitting ? "RAISING…" : "RAISE SNAG"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Snag detail + communication */}
+      {activeSnag && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+          <div className="bg-white border border-surface-container-highest w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-surface-container-highest flex justify-between items-start bg-[#f8f8f8]">
+              <div>
+                <span className="text-[10px] font-bold text-primary tracking-tighter">{activeSnag.id}</span>
+                <h3 className="text-[24px] font-bold text-[#333333] leading-tight">{activeSnag.title}</h3>
+                <p className="text-[10px] text-[#666666] mt-1">{activeSnag.category} • {activeSnag.project}</p>
+              </div>
+              <button onClick={() => setActiveSnag(null)} className="text-[#666666] hover:text-primary transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${activeSnag.priorityStyle}`}>{activeSnag.priority}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${activeSnag.statusStyle}`}>{activeSnag.status}</span>
+                <span className="text-[10px] font-bold text-[#666666] ml-auto">{activeSnag.time}</span>
+              </div>
+              <p className="text-[#333333] text-[16px]">{activeSnag.desc}</p>
+              <div className={`aspect-video w-full rounded overflow-hidden bg-surface-container-lowest border border-surface-container-highest flex items-center justify-center ${activeSnag.closed ? "grayscale opacity-60" : ""}`}>
+                {activeSnag.evidenceUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={activeSnag.evidenceUrl} alt={activeSnag.evidenceName ?? "Site photo"} className="w-full h-full object-contain" />
+                ) : (
+                  <div className="text-[#666666] text-center">
+                    <span className="material-symbols-outlined text-[40px] text-surface-container-highest">image</span>
+                    <p className="text-[10px] mt-1">No evidence</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-[14px] text-[#333333]">
+                <div className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center text-[10px] font-bold text-primary">
+                  {activeSnag.assignee.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                </div>
+                <span>Assigned to <span className="font-bold">{activeSnag.assignee}</span></span>
+              </div>
+
+              {/* Communication thread */}
+              <div className="border-t border-surface-container-highest pt-5">
+                <h4 className="text-[12px] font-bold uppercase tracking-widest text-[#333333] mb-4">Communication</h4>
+                {commentsLoading ? (
+                  <p className="text-[14px] text-[#666666]">Loading…</p>
+                ) : comments.length === 0 ? (
+                  <p className="text-[14px] text-[#666666] mb-4">No messages yet. Start the conversation below.</p>
+                ) : (
+                  <div className="space-y-4 mb-4">
+                    {comments.map(c => (
+                      <div key={c.id} className="flex gap-3">
+                        <div className="w-7 h-7 shrink-0 rounded-full bg-surface-container-highest flex items-center justify-center text-[10px] font-bold text-primary">
+                          {c.author.split(" ").map(w => w[0]).join("").slice(0, 2)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[13px] font-bold text-[#333333]">{c.author}</span>
+                            <span className="text-[10px] text-[#666666]">{new Date(c.at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                          </div>
+                          <p className="text-[14px] text-[#333333] mt-0.5 whitespace-pre-wrap">{c.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handlePostComment(); } }}
+                    placeholder="Write a message…"
+                    className="flex-1 bg-white border border-surface-container-highest rounded p-3 text-[14px] focus:outline-none focus:border-primary transition-all"
+                  />
+                  <button onClick={handlePostComment} disabled={posting || commentText.trim() === ""} className="bg-surface-container-high text-[#333333] px-4 rounded font-bold hover:bg-surface-container-highest transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+                    <span className="material-symbols-outlined text-[20px]">send</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-surface-container-highest bg-[#f8f8f8] flex justify-end gap-4">
+              <button onClick={() => setActiveSnag(null)} className="px-6 py-2 rounded border border-surface-container-highest text-[#333333] hover:bg-surface-container-high font-bold transition-all">CLOSE</button>
+              <button onClick={handleToggleResolved} disabled={resolving} className={`px-8 py-2 rounded font-bold text-white shadow-sm active:scale-95 transition-all disabled:opacity-40 disabled:active:scale-100 ${activeSnag.closed ? "bg-[#666666] hover:opacity-90" : "bg-green-600 hover:opacity-90"}`}>
+                {resolving ? "SAVING…" : activeSnag.closed ? "REOPEN SNAG" : "MARK AS RESOLVED"}
               </button>
             </div>
           </div>

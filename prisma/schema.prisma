@@ -458,6 +458,16 @@ model SnagEntry {
   createdAt    DateTime @default(now())
 }
 
+model SnagComment {
+  id        String   @id
+  snagId    String
+  author    String
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([snagId])
+}
+
 model DesignDoc {
   id        String  @id
   icon      String
