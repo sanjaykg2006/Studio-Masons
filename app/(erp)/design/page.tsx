@@ -15,8 +15,17 @@ interface DesignFile {
   date: string;
   status: FileStatus;
   feedback?: string;
+  projectName: string;     // "" = legacy/global (visible on every project)
+  stageNumber: number | null; // linked Project-Tracker stage (7/9/11) or null
   fileObj?: File;   // populated for user-uploaded files; null for demo entries
 }
+
+// Design stages whose Project-Tracker status auto-reflects these uploads.
+const LINKABLE_STAGES: { n: number; label: string }[] = [
+  { n: 7,  label: "Stage 7 · 3D renders" },
+  { n: 9,  label: "Stage 9 · GFC drawing preparation" },
+  { n: 11, label: "Stage 11 · Final GFC issue" },
+];
 
 const STATUS_INLINE: Record<FileStatus, React.CSSProperties> = {
   "Pending Review":  { background: "rgba(227,6,19,0.08)",  color: "#e30613", borderColor: "rgba(227,6,19,0.2)" },
@@ -87,6 +96,7 @@ export default function DesignPage() {
   const [viewFile, setViewFile]             = useState<DesignFile | null>(null);
   const [feedbackFile, setFeedbackFile]     = useState<DesignFile | null>(null);
   const [uploadedFiles, setUploadedFiles]   = useState<File[]>([]);
+  const [uploadStage, setUploadStage]       = useState<number | "">("");
   const [dragActive, setDragActive]         = useState(false);
   const [mounted, setMounted]               = useState(false);
   const [previewUrl, setPreviewUrl]         = useState<string | null>(null);
@@ -143,12 +153,14 @@ export default function DesignPage() {
 
   useEffect(() => {
     if (!loaded) return;
-    saveDesignDocs(files.map(f => ({ id: f.id, icon: f.icon, name: f.name, meta: f.meta, by: f.by, date: f.date, status: f.status, feedback: f.feedback ?? "" })))
+    saveDesignDocs(files.map(f => ({ id: f.id, icon: f.icon, name: f.name, meta: f.meta, by: f.by, date: f.date, status: f.status, feedback: f.feedback ?? "", projectName: f.projectName ?? "", stageNumber: f.stageNumber ?? null })))
       .catch(err => console.warn("[Design] save failed:", err));
   }, [files, loaded]);
 
+  // Project-scoped: a project's own uploads plus legacy/global (untagged) docs.
+  const scoped = files.filter(f => !f.projectName || f.projectName === selectedProject?.name);
   // Filtered + paginated
-  const filtered = filterStatus === "All" ? files : files.filter(f => f.status === filterStatus);
+  const filtered = filterStatus === "All" ? scoped : scoped.filter(f => f.status === filterStatus);
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageFiles  = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
@@ -202,17 +214,20 @@ export default function DesignPage() {
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         status: "Pending Review",
         feedback: "",
+        projectName: selectedProject?.name ?? "",
+        stageNumber: uploadStage === "" ? null : uploadStage,
         fileObj: uf,
       }, ...prev]);
     });
     setUploadedFiles([]);
+    setUploadStage("");
     setUploadOpen(false);
   }
 
-  // Stats
-  const approvedCount  = files.filter(f => f.status === "Approved").length;
-  const pendingCount   = files.filter(f => f.status === "Pending Review").length;
-  const changesCount   = files.filter(f => f.status === "Changes Needed").length;
+  // Stats (scoped to the selected project)
+  const approvedCount  = scoped.filter(f => f.status === "Approved").length;
+  const pendingCount   = scoped.filter(f => f.status === "Pending Review").length;
+  const changesCount   = scoped.filter(f => f.status === "Changes Needed").length;
 
   // ── No project selected ──────────────────────────────────────
   if (!selectedProject) {
@@ -342,7 +357,12 @@ export default function DesignPage() {
                       </div>
                       <div>
                         <p style={{ fontSize: "14px", color: "#333333", fontWeight: "500" }}>{f.name}</p>
-                        <p style={{ fontSize: "10px", color: "#666666" }}>{f.meta}</p>
+                        <p style={{ fontSize: "10px", color: "#666666", display: "flex", alignItems: "center", gap: "6px" }}>
+                          {f.meta}
+                          {f.stageNumber != null && (
+                            <span style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", padding: "1px 6px", borderRadius: "4px", background: "rgba(37,99,235,0.1)", color: "#2563eb", border: "1px solid rgba(37,99,235,0.2)" }}>Stage {f.stageNumber}</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -476,7 +496,7 @@ export default function DesignPage() {
           <h4 style={{ fontSize: "20px", fontWeight: "500", color: "#333333", marginBottom: "20px", paddingLeft: "8px" }}>Design Summary</h4>
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {[
-              { label: "Total Files",       value: files.length,  color: "#333333" },
+              { label: "Total Files",       value: scoped.length, color: "#333333" },
               { label: "Approved",          value: approvedCount, color: "#16a34a" },
               { label: "Pending Review",    value: pendingCount,  color: "#e30613" },
               { label: "Changes Needed",    value: changesCount,  color: "#ba1a1a" },
@@ -537,6 +557,16 @@ export default function DesignPage() {
                   ))}
                 </div>
               )}
+              {/* Link to a Project-Tracker design stage (auto-reflects its status) */}
+              <div>
+                <p style={{ fontSize: "10px", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.08em", color: "#999999", marginBottom: "6px" }}>Link to design stage (optional)</p>
+                <select value={uploadStage} onChange={e => setUploadStage(e.target.value === "" ? "" : Number(e.target.value))}
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #e4e2e1", borderRadius: "6px", fontSize: "13px", color: "#333333", background: "white", cursor: "pointer", outline: "none" }}>
+                  <option value="">Not linked</option>
+                  {LINKABLE_STAGES.map(s => <option key={s.n} value={s.n}>{s.label}</option>)}
+                </select>
+                <p style={{ fontSize: "10px", color: "#999999", marginTop: "4px" }}>When all docs linked to a stage are approved, that stage shows <strong>Done</strong> on the Project Tracker.</p>
+              </div>
             </div>
             <div style={{ padding: "16px 24px", borderTop: "1px solid #e4e2e1", background: "#f8f8f8", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button onClick={() => { setUploadOpen(false); setUploadedFiles([]); }} style={{ padding: "8px 24px", border: "1px solid #e4e2e1", borderRadius: "6px", background: "white", color: "#333333", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>Cancel</button>

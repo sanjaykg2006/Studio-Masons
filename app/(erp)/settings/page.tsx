@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition, useEffect, useRef } from "react";
-import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, removeMember, uploadAvatar, removeAvatar, changePassword, type Profile, type TeamMember } from "./actions";
+import { inviteUser, getMyProfile, listTeam, createInviteLink, updateRole, updateMemberTeam, removeMember, uploadAvatar, removeAvatar, changePassword, type Profile, type TeamMember } from "./actions";
 import type { Role } from "@/app/generated/prisma";
 import { useAppearance, type SidebarStyle, type DateFormat } from "@/contexts/AppearanceContext";
 import { useToast } from "@/lib/toast";
@@ -135,6 +135,15 @@ export default function SettingsPage() {
     setRowBusy(id);
     updateRole(id, role as Role).then((r) => {
       if (r.ok) setTeam((prev) => prev.map((m) => (m.id === id ? { ...m, role } : m)));
+      else setInviteMsg({ ok: false, text: r.error });
+    }).finally(() => setRowBusy(null));
+  }
+
+  function handleTeamChange(id: string, value: string) {
+    const team = value === "—" ? "" : value;
+    setRowBusy(id);
+    updateMemberTeam(id, team).then((r) => {
+      if (r.ok) setTeam((prev) => prev.map((m) => (m.id === id ? { ...m, team: team || null } : m)));
       else setInviteMsg({ ok: false, text: r.error });
     }).finally(() => setRowBusy(null));
   }
@@ -323,14 +332,14 @@ export default function SettingsPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-[#f8f8f8] border-b border-[#e4e2e1]">
-                  {["Member", "Email", "Role", "Status", "Actions"].map(h => (
+                  {["Member", "Email", "Role", "Team", "Status", "Actions"].map(h => (
                     <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-[#666666]">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e4e2e1]">
                 {team.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-10 text-center text-[#666666] text-[14px]">No team members yet. Use “Invite Member” to add someone.</td></tr>
+                  <tr><td colSpan={6} className="px-6 py-10 text-center text-[#666666] text-[14px]">No team members yet. Use “Invite Member” to add someone.</td></tr>
                 )}
                 {team.map((m) => (
                   <tr key={m.id} className="hover:bg-[#f8f8f8] transition-colors">
@@ -344,6 +353,11 @@ export default function SettingsPage() {
                     <td className="px-6 py-4">
                       <select value={roleLabel[m.role] ?? m.role} disabled={rowBusy === m.id} onChange={(e) => handleRoleChange(m.id, e.target.value)} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613] disabled:opacity-50">
                         {roles.map(r => <option key={r}>{r}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-6 py-4">
+                      <select value={m.team ?? "—"} disabled={rowBusy === m.id} onChange={(e) => handleTeamChange(m.id, e.target.value)} className="bg-white border border-[#e4e2e1] rounded px-2 py-1 text-[13px] focus:outline-none focus:border-[#e30613] disabled:opacity-50">
+                        {["—", "Concept", "Project", "Site"].map(t => <option key={t}>{t}</option>)}
                       </select>
                     </td>
                     <td className="px-6 py-4">

@@ -13,6 +13,7 @@ function isModifiedClick(e: React.MouseEvent) {
 
 const navItems = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
+  { href: "/project-tracker", icon: "timeline", label: "Project Tracker" },
   { href: "/site-survey", icon: "architecture", label: "Site Survey" },
   { href: "/design", icon: "design_services", label: "Design Management" },
   { href: "/purchase-orders", icon: "request_quote", label: "Purchase Orders" },

@@ -3,6 +3,8 @@
 // JSON-safe, page-ready shape (style classes computed here where the UI stores them
 // on the row) so pages only swap their data source — no hardcoded datasets remain.
 import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
+import { Prisma } from "@/app/generated/prisma";
 
 // ── Projects ──────────────────────────────────────────────────────
 export type AppProjectDTO = { id: string; name: string; clientName: string; location: string; pct: number; engineer: string; isDelayed: boolean };
@@ -39,12 +41,18 @@ export async function createProject(input: { name: string; clientName: string; l
 }
 
 // ── Team ──────────────────────────────────────────────────────────
-export type TeamMemberDTO = { id: string; name: string; role: string; email: string | null; phone: string | null; active: boolean };
+export type TeamMemberDTO = { id: string; name: string; role: string; email: string | null; phone: string | null; active: boolean; team: string | null };
 export async function loadTeam(): Promise<TeamMemberDTO[]> {
   // Sourced from real User accounts (what the invite flow populates) so invited &
   // registered members show up in assignee/engineer/inspector dropdowns across the app.
   const rows = await prisma.user.findMany({ orderBy: { createdAt: "asc" } });
-  return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, email: r.email, phone: null, active: true }));
+  return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, email: r.email, phone: null, active: true, team: r.team }));
+}
+
+// Sets a member's design sub-team tag (Concept | Project | Site | null). Used by
+// the Settings team table so people can be slotted into the Project Tracker pickers.
+export async function setMemberTeam(userId: string, team: string | null): Promise<void> {
+  await prisma.user.update({ where: { id: userId }, data: { team } });
 }
 
 // ── Activity feed ─────────────────────────────────────────────────
@@ -144,15 +152,15 @@ export async function addSnagComment(input: { snagId: string; author: string; te
 }
 
 // ── Design docs ───────────────────────────────────────────────────
-export type DesignDocDTO = { id: string; icon: string; name: string; meta: string; by: string; date: string; status: string; feedback: string };
+export type DesignDocDTO = { id: string; icon: string; name: string; meta: string; by: string; date: string; status: string; feedback: string; projectName: string; stageNumber: number | null };
 export async function loadDesignDocs(): Promise<DesignDocDTO[]> {
   const rows = await prisma.designDoc.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, icon: r.icon, name: r.name, meta: r.meta, by: r.by, date: r.date, status: r.status, feedback: r.feedback ?? "" }));
+  return rows.map((r) => ({ id: r.id, icon: r.icon, name: r.name, meta: r.meta, by: r.by, date: r.date, status: r.status, feedback: r.feedback ?? "", projectName: r.projectName, stageNumber: r.stageNumber }));
 }
 export async function saveDesignDocs(list: DesignDocDTO[]): Promise<void> {
   await prisma.$transaction([
     prisma.designDoc.deleteMany({}),
-    prisma.designDoc.createMany({ data: list.map((d, i) => ({ id: d.id, icon: d.icon, name: d.name, meta: d.meta, by: d.by, date: d.date, status: d.status, feedback: d.feedback ?? "", sortOrder: i })) }),
+    prisma.designDoc.createMany({ data: list.map((d, i) => ({ id: d.id, icon: d.icon, name: d.name, meta: d.meta, by: d.by, date: d.date, status: d.status, feedback: d.feedback ?? "", projectName: d.projectName ?? "", stageNumber: d.stageNumber ?? null, sortOrder: i })) }),
   ]);
 }
 
@@ -552,4 +560,416 @@ export async function fireWebhook(id: string): Promise<{ webhook: WebhookDTO; de
     delivered,
     detail,
   };
+}
+
+// ── Project Tracker (14-stage Design Operating System) ────────────
+export type StageZone = "CONCEPT" | "PROJECT";
+export type StageStatus = "NOT_STARTED" | "ON_TRACK" | "SUBMITTED" | "DELAY_RISK" | "DELAYED" | "ON_HOLD" | "DONE";
+export type ProjectStageDTO = {
+  stageNumber: number; activity: string; output: string; checkpoint: string;
+  zone: StageZone; phase: string; autoSource: string | null; auto: boolean;
+  // Approval-gate metadata (null on non-gate stages).
+  gateNumber: number | null; gateCheck: string | null; gateOwner: string | null; gateOutput: string | null;
+  // Dashboard columns + live status.
+  status: StageStatus; ownerId: string | null; ownerName: string | null;
+  plannedDate: string | null; actualDate: string | null;
+  dependency: string; risk: string; nextAction: string;
+  signedOffBy: string | null; notes: string; completedAt: string | null;
+  // Pending status move awaiting a higher post's approval (null = none).
+  pendingStatus: StageStatus | null; pendingBy: string | null; pendingById: string | null; pendingRank: number | null;
+};
+export type ProjectTeamDTO = {
+  conceptLeadId: string | null; conceptViceLeadId: string | null;
+  projectLeadId: string | null; projectViceLeadId: string | null;
+  conceptHelpers: string[]; projectHelpers: string[];
+  handoffAt: string | null; handoffBy: string | null;
+};
+export type TrackerActor = { id: string; name: string; role: string; team: string | null };
+export type TrackerMsg = { ok: true; queued?: boolean } | { ok: false; error: string };
+export type TeamRole = "LEAD" | "VICE";
+
+// The 14 master stages from the Design Operating System deck. Stages 1–11 are the
+// Concept zone, 12–14 the Project zone; the 4 phases and 7 approval gates come from
+// Action 1. Stage 2 auto-reflects the Site Survey module.
+type StageTpl = { stageNumber: number; activity: string; output: string; checkpoint: string; zone: StageZone; phase: string; autoSource: string | null; gateNumber?: number; gateCheck?: string; gateOwner?: string; gateOutput?: string };
+const STAGE_TEMPLATE: StageTpl[] = [
+  { stageNumber: 1,  activity: "Project brief received",            output: "Requirement summary",               checkpoint: "Internal design briefing",                                          zone: "CONCEPT", phase: "Initiation",         autoSource: null },
+  { stageNumber: 2,  activity: "Site study / base drawing review",  output: "Site constraints list",             checkpoint: "Check dimensions, ceiling height, services, existing conditions",    zone: "CONCEPT", phase: "Initiation",         autoSource: "survey" },
+  { stageNumber: 3,  activity: "Client requirement validation",     output: "Final requirement checklist",       checkpoint: "Confirm operational needs before planning",                          zone: "CONCEPT", phase: "Initiation",         autoSource: null, gateNumber: 1, gateCheck: "Requirement freeze + site constraint review", gateOwner: "Project Architect + Client", gateOutput: "Confirmed brief" },
+  { stageNumber: 4,  activity: "Test-fit / concept layout",         output: "Layout options",                    checkpoint: "Internal review before client issue",                                zone: "CONCEPT", phase: "Design Development", autoSource: null, gateNumber: 2, gateCheck: "Layout approval before concept/render", gateOwner: "Design Head + Client", gateOutput: "Approved layout" },
+  { stageNumber: 5,  activity: "MEP initial briefing",              output: "MEP feasibility notes",             checkpoint: "HVAC, electrical, plumbing, fire, server, UPS, ceiling height check", zone: "CONCEPT", phase: "Design Development", autoSource: null, gateNumber: 3, gateCheck: "MEP feasibility: ceiling height, HVAC, electrical, fire", gateOwner: "Design + MEP", gateOutput: "Feasibility notes" },
+  { stageNumber: 6,  activity: "Design concept / mood board",       output: "Look & feel direction",             checkpoint: "Management / client review",                                         zone: "CONCEPT", phase: "Design Development", autoSource: null },
+  { stageNumber: 7,  activity: "3D renders",                        output: "Approved design intent",            checkpoint: "Ensure ceiling, MEP, lighting, furniture logic is considered",       zone: "CONCEPT", phase: "Design Development", autoSource: "design" },
+  { stageNumber: 8,  activity: "Design freeze",                     output: "Signed-off layout and look & feel", checkpoint: "No informal changes after this stage",                               zone: "CONCEPT", phase: "Approval + GFC",     autoSource: null, gateNumber: 4, gateCheck: "Look & feel / 3D approval", gateOwner: "Design + Client", gateOutput: "Design freeze" },
+  { stageNumber: 9,  activity: "GFC drawing preparation",          output: "Full drawing package",              checkpoint: "Drawing QA checklist",                                               zone: "CONCEPT", phase: "Approval + GFC",     autoSource: "design" },
+  { stageNumber: 10, activity: "MEP coordination review",          output: "Coordinated RCP / services",        checkpoint: "Mandatory before GFC release",                                       zone: "CONCEPT", phase: "Approval + GFC",     autoSource: null },
+  { stageNumber: 11, activity: "Final GFC issue",                  output: "Drawing issue register",            checkpoint: "Revision number, date, recipients recorded",                         zone: "CONCEPT", phase: "Approval + GFC",     autoSource: "design", gateNumber: 5, gateCheck: "GFC internal QA and issue register", gateOwner: "Design Team", gateOutput: "GFC package" },
+  { stageNumber: 12, activity: "DTM before execution",            output: "Site execution clarity",            checkpoint: "Design + Project + MEP + vendor alignment",                          zone: "PROJECT", phase: "Execution Control", autoSource: null, gateNumber: 6, gateCheck: "DTM before execution with project, MEP and vendors", gateOwner: "Project + Design", gateOutput: "DTM MOM" },
+  { stageNumber: 13, activity: "Site support / design clarification", output: "RFIs / site notes",              checkpoint: "Only clarification, not redesign",                                   zone: "PROJECT", phase: "Execution Control", autoSource: null },
+  { stageNumber: 14, activity: "Change order control",            output: "Variation tracker",                 checkpoint: "Any change after sign-off to be formally approved",                   zone: "PROJECT", phase: "Execution Control", autoSource: null, gateNumber: 7, gateCheck: "Post sign-off change approval with cost impact", gateOwner: "Project + QS + Client", gateOutput: "Change register" },
+];
+
+// Seeds/refreshes the master template (idempotent upsert of all 14 rows). Called
+// lazily by the loaders so the tracker self-heals without a manual seed step.
+async function ensureStageTemplate(): Promise<void> {
+  await prisma.$transaction(
+    STAGE_TEMPLATE.map((s, i) =>
+      prisma.projectStageTemplate.upsert({
+        where: { stageNumber: s.stageNumber },
+        update: { activity: s.activity, output: s.output, checkpoint: s.checkpoint, zone: s.zone, phase: s.phase, autoSource: s.autoSource, gateNumber: s.gateNumber ?? null, gateCheck: s.gateCheck ?? null, gateOwner: s.gateOwner ?? null, gateOutput: s.gateOutput ?? null, sortOrder: i },
+        create: { stageNumber: s.stageNumber, activity: s.activity, output: s.output, checkpoint: s.checkpoint, zone: s.zone, phase: s.phase, autoSource: s.autoSource, gateNumber: s.gateNumber ?? null, gateCheck: s.gateCheck ?? null, gateOwner: s.gateOwner ?? null, gateOutput: s.gateOutput ?? null, sortOrder: i },
+      })
+    )
+  );
+}
+
+// Derives Stage 2's status from the project's Site Survey records (auto-reflect).
+async function surveyAutoStatus(projectName: string): Promise<StageStatus> {
+  if (!projectName) return "NOT_STARTED";
+  const surveys = await prisma.surveyEntry.findMany({ where: { projectName } });
+  if (surveys.length === 0) return "NOT_STARTED";
+  const done = surveys.some((s) => /complete|approved|done|sign/i.test(s.status));
+  return done ? "DONE" : "ON_TRACK";
+}
+
+// Derives a design stage's status from the design docs linked to it (stages 7/9/11):
+// all approved → DONE, any changes-needed → DELAY_RISK, otherwise SUBMITTED.
+function designAutoStatus(docs: { status: string; stageNumber: number | null }[], stageNumber: number): StageStatus {
+  const linked = docs.filter((d) => d.stageNumber === stageNumber);
+  if (linked.length === 0) return "NOT_STARTED";
+  if (linked.some((d) => /change/i.test(d.status))) return "DELAY_RISK";
+  if (linked.every((d) => /approved/i.test(d.status))) return "DONE";
+  return "SUBMITTED";
+}
+
+const STAGE_LABEL: Record<StageStatus, string> = {
+  NOT_STARTED: "Reset", ON_TRACK: "On track", SUBMITTED: "Submitted", DELAY_RISK: "Flagged at-risk", DELAYED: "Marked delayed", ON_HOLD: "Put on hold", DONE: "Completed",
+};
+const STATUS_NOUN: Record<StageStatus, string> = {
+  NOT_STARTED: "Not started", ON_TRACK: "On track", SUBMITTED: "Submitted", DELAY_RISK: "Delay risk", DELAYED: "Delayed", ON_HOLD: "On hold", DONE: "Done",
+};
+
+async function logTrackerActivity(projectId: string, icon: string, text: string, by: string): Promise<void> {
+  const project = await prisma.appProject.findUnique({ where: { id: projectId } });
+  await prisma.activityEntry.create({
+    data: {
+      id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      icon, color: "#e30613", route: "/project-tracker",
+      text, bold: project?.name ?? "", detail: text, by, at: new Date(),
+    },
+  });
+}
+
+export async function loadProjectStages(projectId: string): Promise<ProjectStageDTO[]> {
+  await ensureStageTemplate();
+  const [tpl, rows, project, users] = await Promise.all([
+    prisma.projectStageTemplate.findMany({ orderBy: { stageNumber: "asc" } }),
+    prisma.projectStage.findMany({ where: { projectId } }),
+    prisma.appProject.findUnique({ where: { id: projectId } }),
+    prisma.user.findMany({ select: { id: true, name: true } }),
+  ]);
+  const byNum = new Map(rows.map((r) => [r.stageNumber, r]));
+  const nameById = new Map(users.map((u) => [u.id, u.name]));
+  const projectName = project?.name ?? "";
+  const needsSurvey = tpl.some((t) => t.autoSource === "survey");
+  const needsDesign = tpl.some((t) => t.autoSource === "design");
+  const surveyStatus = needsSurvey ? await surveyAutoStatus(projectName) : "NOT_STARTED";
+  const designDocs = needsDesign && projectName
+    ? await prisma.designDoc.findMany({ where: { projectName }, select: { status: true, stageNumber: true } })
+    : [];
+  return tpl.map((t) => {
+    const row = byNum.get(t.stageNumber);
+    let status: StageStatus;
+    let signedOffBy = row?.signedOffBy ?? null;
+    if (t.autoSource === "survey") {
+      status = surveyStatus;
+      if (status === "DONE" && !signedOffBy) signedOffBy = "Auto · Site Survey";
+    } else if (t.autoSource === "design") {
+      status = designAutoStatus(designDocs, t.stageNumber);
+      if (status === "DONE" && !signedOffBy) signedOffBy = "Auto · Design approvals";
+    } else {
+      status = (row?.status as StageStatus) ?? "NOT_STARTED";
+    }
+    return {
+      stageNumber: t.stageNumber, activity: t.activity, output: t.output, checkpoint: t.checkpoint,
+      zone: t.zone as StageZone, phase: t.phase, autoSource: t.autoSource, auto: !!t.autoSource,
+      gateNumber: t.gateNumber, gateCheck: t.gateCheck, gateOwner: t.gateOwner, gateOutput: t.gateOutput,
+      status, ownerId: row?.ownerId ?? null, ownerName: row?.ownerId ? nameById.get(row.ownerId) ?? null : null,
+      plannedDate: row?.plannedDate ? row.plannedDate.toISOString() : null,
+      actualDate: row?.actualDate ? row.actualDate.toISOString() : null,
+      dependency: row?.dependency ?? "", risk: row?.risk ?? "", nextAction: row?.nextAction ?? "",
+      signedOffBy, notes: row?.notes ?? "",
+      completedAt: row?.completedAt ? row.completedAt.toISOString() : null,
+      pendingStatus: (row?.pendingStatus as StageStatus | undefined) ?? null,
+      pendingBy: row?.pendingBy ?? null, pendingById: row?.pendingById ?? null, pendingRank: row?.pendingRank ?? null,
+    };
+  });
+}
+
+export async function loadProjectTeam(projectId: string): Promise<ProjectTeamDTO> {
+  const row = await prisma.projectTeam.upsert({
+    where: { projectId }, update: {}, create: { projectId, conceptHelpers: [], projectHelpers: [] },
+  });
+  return {
+    conceptLeadId: row.conceptLeadId, conceptViceLeadId: row.conceptViceLeadId,
+    projectLeadId: row.projectLeadId, projectViceLeadId: row.projectViceLeadId,
+    conceptHelpers: row.conceptHelpers, projectHelpers: row.projectHelpers,
+    handoffAt: row.handoffAt ? row.handoffAt.toISOString() : null, handoffBy: row.handoffBy,
+  };
+}
+
+export async function loadCurrentActor(): Promise<TrackerActor | null> {
+  const u = await getCurrentUser();
+  return u ? { id: u.id, name: u.name, role: u.role, team: u.team } : null;
+}
+
+// Single round-trip loader for the tracker page.
+export async function loadTrackerPage(projectId: string) {
+  const [stages, team, actor, members] = await Promise.all([
+    loadProjectStages(projectId), loadProjectTeam(projectId), loadCurrentActor(), loadTeam(),
+  ]);
+  return { stages, team, actor, members };
+}
+
+// Authority rank for a zone: 3 = admin / project manager (top approver),
+// 2 = the zone lead, 1 = the zone vice lead, 0 = helper / unrelated.
+type TeamRanks = { conceptLeadId: string | null; conceptViceLeadId: string | null; projectLeadId: string | null; projectViceLeadId: string | null };
+function zoneRank(actor: { id: string; role: string }, team: TeamRanks, zone: StageZone): number {
+  if (actor.role === "ADMIN" || actor.role === "PROJECT_MANAGER") return 3;
+  const leadId = zone === "CONCEPT" ? team.conceptLeadId : team.projectLeadId;
+  const viceId = zone === "CONCEPT" ? team.conceptViceLeadId : team.projectViceLeadId;
+  if (leadId && actor.id === leadId) return 2;
+  if (viceId && actor.id === viceId) return 1;
+  return 0;
+}
+
+function applyStatusFields(fields: Prisma.ProjectStageUncheckedUpdateInput, status: StageStatus, byName: string): void {
+  const done = status === "DONE";
+  fields.status = status;
+  fields.signedOffBy = done ? byName : null;
+  fields.completedAt = done ? new Date() : null;
+  if (done) fields.actualDate = new Date();
+}
+
+// Assigns a zone's lead or vice lead. Locked once set — a major decision, so only
+// an admin or project manager may assign, and an already-set holder is never replaced.
+export async function assignLead(input: { projectId: string; zone: StageZone; role?: TeamRole; memberId: string }): Promise<TrackerMsg> {
+  const role: TeamRole = input.role ?? "LEAD";
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  if (actor.role !== "ADMIN" && actor.role !== "PROJECT_MANAGER") return { ok: false, error: "Only admins or project managers can assign leads." };
+  const team = await prisma.projectTeam.upsert({ where: { projectId: input.projectId }, update: {}, create: { projectId: input.projectId, conceptHelpers: [], projectHelpers: [] } });
+  const leadId = input.zone === "CONCEPT" ? team.conceptLeadId : team.projectLeadId;
+  const viceId = input.zone === "CONCEPT" ? team.conceptViceLeadId : team.projectViceLeadId;
+  const current = role === "LEAD" ? leadId : viceId;
+  const other = role === "LEAD" ? viceId : leadId;
+  const roleLabel = role === "LEAD" ? "lead" : "vice lead";
+  if (current) return { ok: false, error: `This zone already has a ${roleLabel} — it is locked once assigned.` };
+  if (other && other === input.memberId) return { ok: false, error: "That person already holds the other role in this zone." };
+  const member = await prisma.user.findUnique({ where: { id: input.memberId } });
+  if (!member) return { ok: false, error: "Member not found." };
+  const data =
+    input.zone === "CONCEPT"
+      ? (role === "LEAD" ? { conceptLeadId: input.memberId } : { conceptViceLeadId: input.memberId })
+      : (role === "LEAD" ? { projectLeadId: input.memberId } : { projectViceLeadId: input.memberId });
+  await prisma.projectTeam.update({ where: { projectId: input.projectId }, data });
+  await logTrackerActivity(input.projectId, "person_add", `Assigned ${member.name} as ${input.zone === "CONCEPT" ? "Concept" : "Project"} ${roleLabel}`, actor.name);
+  return { ok: true };
+}
+
+// Replaces a zone's helper list. Helpers assist the lead but cannot make the
+// major decisions (advancing stages / handoff).
+export async function setHelpers(input: { projectId: string; zone: StageZone; memberIds: string[] }): Promise<TrackerMsg> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  if (actor.role !== "ADMIN" && actor.role !== "PROJECT_MANAGER") return { ok: false, error: "Only admins or project managers can set helpers." };
+  await prisma.projectTeam.upsert({
+    where: { projectId: input.projectId },
+    update: input.zone === "CONCEPT" ? { conceptHelpers: input.memberIds } : { projectHelpers: input.memberIds },
+    create: { projectId: input.projectId, conceptHelpers: input.zone === "CONCEPT" ? input.memberIds : [], projectHelpers: input.zone === "PROJECT" ? input.memberIds : [] },
+  });
+  return { ok: true };
+}
+
+// Updates a stage's status and/or dashboard columns (owner, dates, dependency,
+// risk, next action, notes). Only the zone's lead (or an admin) may do it; auto
+// stages reject status changes; Project-zone stages stay locked until the handoff.
+export type StagePatch = {
+  status?: StageStatus; ownerId?: string | null;
+  plannedDate?: string | null; actualDate?: string | null;
+  dependency?: string; risk?: string; nextAction?: string; notes?: string;
+};
+export async function updateStage(input: { projectId: string; stageNumber: number; patch: StagePatch }): Promise<TrackerMsg> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  await ensureStageTemplate();
+  const tpl = await prisma.projectStageTemplate.findUnique({ where: { stageNumber: input.stageNumber } });
+  if (!tpl) return { ok: false, error: "Unknown stage." };
+  const team = await prisma.projectTeam.upsert({ where: { projectId: input.projectId }, update: {}, create: { projectId: input.projectId, conceptHelpers: [], projectHelpers: [] } });
+  const rank = zoneRank(actor, team, tpl.zone as StageZone);
+  if (rank < 1) return { ok: false, error: `Only the ${tpl.zone === "CONCEPT" ? "Concept" : "Project"} lead, vice lead or a higher post can update this stage.` };
+  if (tpl.zone === "PROJECT" && !team.handoffAt) return { ok: false, error: "Project-zone stages unlock only after the Stage 11 → 12 handoff." };
+
+  const p = input.patch;
+  if (p.status !== undefined && tpl.autoSource) return { ok: false, error: "This stage's status updates automatically from its module." };
+
+  const existing = await prisma.projectStage.findUnique({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } } });
+  const currentStatus = (existing?.status as StageStatus | undefined) ?? "NOT_STARTED";
+
+  // Operational columns apply immediately for any lead/vice/higher post.
+  const fields: Prisma.ProjectStageUncheckedUpdateInput = {};
+  if (p.ownerId !== undefined) fields.ownerId = p.ownerId;
+  if (p.plannedDate !== undefined) fields.plannedDate = p.plannedDate ? new Date(p.plannedDate) : null;
+  if (p.actualDate !== undefined) fields.actualDate = p.actualDate ? new Date(p.actualDate) : null;
+  if (p.dependency !== undefined) fields.dependency = p.dependency;
+  if (p.risk !== undefined) fields.risk = p.risk;
+  if (p.nextAction !== undefined) fields.nextAction = p.nextAction;
+  if (p.notes !== undefined) fields.notes = p.notes;
+
+  // A status move is gated: PM/admin (rank 3) apply it; a lead/vice queue a request
+  // that a strictly higher post must approve.
+  let queued = false;
+  if (p.status !== undefined && p.status !== currentStatus) {
+    if (rank >= 3) {
+      applyStatusFields(fields, p.status, actor.name);
+      fields.pendingStatus = null; fields.pendingBy = null; fields.pendingById = null; fields.pendingRank = null; fields.pendingAt = null;
+    } else {
+      fields.pendingStatus = p.status; fields.pendingBy = actor.name; fields.pendingById = actor.id; fields.pendingRank = rank; fields.pendingAt = new Date();
+      queued = true;
+    }
+  }
+
+  await prisma.projectStage.upsert({
+    where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } },
+    update: fields,
+    create: { ...(fields as Prisma.ProjectStageUncheckedCreateInput), projectId: input.projectId, stageNumber: input.stageNumber },
+  });
+  if (p.status !== undefined && p.status !== currentStatus) {
+    await logTrackerActivity(
+      input.projectId,
+      queued ? "pending_actions" : "checklist",
+      queued
+        ? `Requested "${STATUS_NOUN[p.status]}" on stage ${input.stageNumber} — ${tpl.activity} (awaiting approval)`
+        : `${STAGE_LABEL[p.status]} stage ${input.stageNumber} — ${tpl.activity}`,
+      actor.name,
+    );
+  }
+  return { ok: true, queued };
+}
+
+// Approve a queued status move. Requires a strictly higher post than the requester.
+export async function approveStageChange(input: { projectId: string; stageNumber: number }): Promise<TrackerMsg> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  const tpl = await prisma.projectStageTemplate.findUnique({ where: { stageNumber: input.stageNumber } });
+  if (!tpl) return { ok: false, error: "Unknown stage." };
+  const team = await prisma.projectTeam.findUnique({ where: { projectId: input.projectId } });
+  const row = await prisma.projectStage.findUnique({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } } });
+  if (!row || !row.pendingStatus) return { ok: false, error: "No pending change to approve." };
+  const rank = zoneRank(actor, team ?? EMPTY_RANKS, tpl.zone as StageZone);
+  if (rank <= (row.pendingRank ?? 0)) return { ok: false, error: "Only a higher post than the requester can approve this change." };
+  const fields: Prisma.ProjectStageUncheckedUpdateInput = {};
+  applyStatusFields(fields, row.pendingStatus as StageStatus, actor.name);
+  fields.pendingStatus = null; fields.pendingBy = null; fields.pendingById = null; fields.pendingRank = null; fields.pendingAt = null;
+  await prisma.projectStage.update({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } }, data: fields });
+  await logTrackerActivity(input.projectId, "verified", `Approved "${STATUS_NOUN[row.pendingStatus as StageStatus]}" on stage ${input.stageNumber} — ${tpl.activity}`, actor.name);
+  return { ok: true };
+}
+
+// Reject a queued status move (a higher post) or cancel your own request.
+export async function rejectStageChange(input: { projectId: string; stageNumber: number }): Promise<TrackerMsg> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  const tpl = await prisma.projectStageTemplate.findUnique({ where: { stageNumber: input.stageNumber } });
+  if (!tpl) return { ok: false, error: "Unknown stage." };
+  const team = await prisma.projectTeam.findUnique({ where: { projectId: input.projectId } });
+  const row = await prisma.projectStage.findUnique({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } } });
+  if (!row || !row.pendingStatus) return { ok: false, error: "No pending change." };
+  const rank = zoneRank(actor, team ?? EMPTY_RANKS, tpl.zone as StageZone);
+  const isRequester = !!row.pendingById && row.pendingById === actor.id;
+  if (!isRequester && rank <= (row.pendingRank ?? 0)) return { ok: false, error: "Only the requester or a higher post can clear this request." };
+  await prisma.projectStage.update({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: input.stageNumber } }, data: { pendingStatus: null, pendingBy: null, pendingById: null, pendingRank: null, pendingAt: null } });
+  await logTrackerActivity(input.projectId, "cancel", `${isRequester ? "Cancelled" : "Rejected"} the status request on stage ${input.stageNumber} — ${tpl.activity}`, actor.name);
+  return { ok: true };
+}
+
+const EMPTY_RANKS: TeamRanks = { conceptLeadId: null, conceptViceLeadId: null, projectLeadId: null, projectViceLeadId: null };
+
+// The Stage 11 → 12 gate: transfers control from the Concept team to the Project
+// team. Requires Stage 11 = Done and the actor to be the Concept lead (or admin).
+export async function triggerHandoff(input: { projectId: string }): Promise<TrackerMsg> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  const team = await prisma.projectTeam.upsert({ where: { projectId: input.projectId }, update: {}, create: { projectId: input.projectId, conceptHelpers: [], projectHelpers: [] } });
+  if (team.handoffAt) return { ok: false, error: "Handoff already completed." };
+  const isLead = team.conceptLeadId !== null && team.conceptLeadId === actor.id;
+  if (!isLead && actor.role !== "ADMIN") return { ok: false, error: "Only the Concept lead can hand off to the Project team." };
+  const s11 = await prisma.projectStage.findUnique({ where: { projectId_stageNumber: { projectId: input.projectId, stageNumber: 11 } } });
+  if (!s11 || s11.status !== "DONE") return { ok: false, error: "Stage 11 (Final GFC issue) must be marked Done before handoff." };
+  await prisma.projectTeam.update({ where: { projectId: input.projectId }, data: { handoffAt: new Date(), handoffBy: actor.name } });
+  await logTrackerActivity(input.projectId, "swap_horiz", "Handed off control to the Project team", actor.name);
+  return { ok: true };
+}
+
+// ── Project registers (Drawing Issue + Change/Risk) ───────────────
+// Either project lead, a project manager or an admin may edit the registers.
+async function guardRegisters(projectId: string): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
+  const actor = await getCurrentUser();
+  if (!actor) return { ok: false, error: "Not authenticated." };
+  if (actor.role === "ADMIN" || actor.role === "PROJECT_MANAGER") return { ok: true, name: actor.name };
+  const team = await prisma.projectTeam.findUnique({ where: { projectId } });
+  if (team && [team.conceptLeadId, team.conceptViceLeadId, team.projectLeadId, team.projectViceLeadId].includes(actor.id)) return { ok: true, name: actor.name };
+  return { ok: false, error: "Only a project lead, vice lead, project manager or admin can edit the registers." };
+}
+
+export type DrawingIssueDTO = { id: string; drawingNo: string; title: string; revision: string; issueDate: string; recipients: string; purpose: string | null; status: string; issuedBy: string };
+export type DrawingIssueInput = { drawingNo: string; title: string; revision: string; issueDate: string; recipients: string; purpose?: string; status: string };
+export async function loadDrawingIssues(projectId: string): Promise<DrawingIssueDTO[]> {
+  const rows = await prisma.drawingIssue.findMany({ where: { projectId }, orderBy: { issueDate: "desc" } });
+  return rows.map((r) => ({ id: r.id, drawingNo: r.drawingNo, title: r.title, revision: r.revision, issueDate: r.issueDate.toISOString(), recipients: r.recipients, purpose: r.purpose, status: r.status, issuedBy: r.issuedBy }));
+}
+export async function addDrawingIssue(projectId: string, input: DrawingIssueInput): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.drawingIssue.create({ data: { projectId, drawingNo: input.drawingNo.trim(), title: input.title.trim(), revision: input.revision.trim() || "R0", issueDate: input.issueDate ? new Date(input.issueDate) : new Date(), recipients: input.recipients, purpose: input.purpose ?? null, status: input.status, issuedBy: guard.name } });
+  await logTrackerActivity(projectId, "draft", `Issued drawing ${input.drawingNo} (${input.revision})`, guard.name);
+  return { ok: true };
+}
+export async function updateDrawingIssue(id: string, projectId: string, input: DrawingIssueInput): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.drawingIssue.update({ where: { id }, data: { drawingNo: input.drawingNo.trim(), title: input.title.trim(), revision: input.revision.trim() || "R0", issueDate: input.issueDate ? new Date(input.issueDate) : new Date(), recipients: input.recipients, purpose: input.purpose ?? null, status: input.status } });
+  return { ok: true };
+}
+export async function deleteDrawingIssue(id: string, projectId: string): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.drawingIssue.delete({ where: { id } });
+  return { ok: true };
+}
+
+export type ChangeItemDTO = { id: string; title: string; description: string | null; raisedDate: string; costImpact: string; escalationRoute: string; owner: string | null; priority: string; status: string };
+export type ChangeItemInput = { title: string; description?: string; raisedDate: string; costImpact: string; escalationRoute: string; owner?: string; priority: string; status: string };
+export async function loadChangeItems(projectId: string): Promise<ChangeItemDTO[]> {
+  const rows = await prisma.changeItem.findMany({ where: { projectId }, orderBy: { raisedDate: "desc" } });
+  return rows.map((r) => ({ id: r.id, title: r.title, description: r.description, raisedDate: r.raisedDate.toISOString(), costImpact: r.costImpact, escalationRoute: r.escalationRoute, owner: r.owner, priority: r.priority, status: r.status }));
+}
+export async function addChangeItem(projectId: string, input: ChangeItemInput): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.changeItem.create({ data: { projectId, title: input.title.trim(), description: input.description ?? null, raisedDate: input.raisedDate ? new Date(input.raisedDate) : new Date(), costImpact: input.costImpact, escalationRoute: input.escalationRoute, owner: input.owner ?? null, priority: input.priority, status: input.status } });
+  await logTrackerActivity(projectId, "published_with_changes", `Logged change: ${input.title}`, guard.name);
+  return { ok: true };
+}
+export async function updateChangeItem(id: string, projectId: string, input: ChangeItemInput): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.changeItem.update({ where: { id }, data: { title: input.title.trim(), description: input.description ?? null, raisedDate: input.raisedDate ? new Date(input.raisedDate) : new Date(), costImpact: input.costImpact, escalationRoute: input.escalationRoute, owner: input.owner ?? null, priority: input.priority, status: input.status } });
+  return { ok: true };
+}
+export async function deleteChangeItem(id: string, projectId: string): Promise<TrackerMsg> {
+  const guard = await guardRegisters(projectId);
+  if (!guard.ok) return guard;
+  await prisma.changeItem.delete({ where: { id } });
+  return { ok: true };
 }

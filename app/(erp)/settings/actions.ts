@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { Role } from "@/app/generated/prisma";
 
 export type Profile = { name: string; email: string; role: string; avatarUrl: string | null };
-export type TeamMember = Profile & { id: string; status: "Active" | "Invited" };
+export type TeamMember = Profile & { id: string; status: "Active" | "Invited"; team: string | null };
 
 // The currently logged-in user's own profile (name/email/role from the DB row).
 export async function getMyProfile(): Promise<Profile | null> {
@@ -50,8 +50,21 @@ export async function listTeam(): Promise<TeamMember[]> {
     email: u.email,
     role: u.role,
     avatarUrl: u.avatarUrl,
+    team: u.team,
     status: !adminOk || (u.supabaseId && confirmed.get(u.supabaseId)) ? "Active" : "Invited",
   }));
+}
+
+// Admin-only: tag a member's design sub-team (Concept | Project | Site). Drives
+// the Project Tracker lead/helper pickers. An empty value clears the tag.
+export async function updateMemberTeam(userId: string, team: string): Promise<ActionResult> {
+  try {
+    await requireRole(["ADMIN"]);
+  } catch {
+    return { ok: false, error: "Only admins can change teams." };
+  }
+  await prisma.user.update({ where: { id: userId }, data: { team: team || null } });
+  return { ok: true };
 }
 
 // Builds a link that points at our own /auth/confirm route (token_hash flow),
