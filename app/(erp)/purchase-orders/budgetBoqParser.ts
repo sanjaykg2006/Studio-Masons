@@ -25,7 +25,16 @@ export type ParsedSheet = {
   rateMode: "single" | "split" | "none";
   columnNote: string;        // human summary of what was detected
   lines: ParsedBudgetLine[];
+  // Self-reconciliation: the sum of the parsed line amounts vs the sheet's own
+  // stated total (grand total, else the sum of its section subtotals). "unchecked"
+  // when the sheet carries no usable total row. Non-blocking — surfaced for review.
+  parsedTotal: number;
+  statedTotal: number | null;
+  reconciled: "ok" | "mismatch" | "unchecked";
 };
+
+// Defaults for sheets that are skipped before any line parsing.
+const NO_RECON = { parsedTotal: 0, statedTotal: null as number | null, reconciled: "unchecked" as const };
 
 const norm = (v: unknown) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -101,13 +110,13 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
     // Auto-skip sheets hidden in the workbook — the user doesn't see these (e.g. the
     // duplicate "- Indegene" working copies), so they shouldn't import by default.
     if (visibility[si]?.Hidden) {
-      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "Hidden in the workbook", rateMode: "none", columnNote: "—", lines: [] });
+      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "Hidden in the workbook", rateMode: "none", columnNote: "—", lines: [], ...NO_RECON });
       continue;
     }
 
     // Auto-skip obvious non-line-item sheets by name.
     if (/summary|measurement|^m sheet|cost-?summary/.test(nameNorm)) {
-      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "Looks like a summary / measurement sheet", rateMode: "none", columnNote: "—", lines: [] });
+      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "Looks like a summary / measurement sheet", rateMode: "none", columnNote: "—", lines: [], ...NO_RECON });
       continue;
     }
 
@@ -168,27 +177,40 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
     }
 
     if (headerIdx === -1) {
-      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "No BOQ header row found", rateMode: "none", columnNote: "—", lines: [] });
+      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "No BOQ header row found", rateMode: "none", columnNote: "—", lines: [], ...NO_RECON });
       continue;
     }
 
     const rateMode: ParsedSheet["rateMode"] = supplyCol !== -1 && installCol !== -1 ? "split" : singleRateCol !== -1 ? "single" : "none";
+    // Amount on any row, using the same column logic the line items use.
+    const rowAmount = (cells: unknown[], qty: number, rate: number) =>
+      supplyAmtCol !== -1 && installAmtCol !== -1
+        ? cleanNum(cells[supplyAmtCol]) + cleanNum(cells[installAmtCol])
+        : amountCol !== -1 ? cleanNum(cells[amountCol]) : qty * rate;
     const lines: ParsedBudgetLine[] = [];
+    const totals: { label: string; amount: number }[] = []; // captured total/subtotal rows
     for (let i = headerIdx + 1; i < rows.length; i++) {
       const cells = rows[i];
       const item = String(cells[descCol] ?? "").trim();
       if (!item || item.length < 2) continue;
       if (/^\d+(\.\d+)?$/.test(item)) continue; // stray serial number leaked into desc
-      if (isTotalRow(item)) continue;            // subtotal / total / carried-to-summary roll-ups
+      if (isTotalRow(item)) {
+        // Capture the sheet's own totals for reconciliation, ignoring GST / tax-
+        // inclusive rows (those exceed the ex-GST line sum).
+        const lbl = item.toLowerCase().replace(/\s+/g, " ").trim();
+        if (!/gst|incl|including|with tax|tax\b/.test(lbl)) {
+          const ta = rowAmount(cells, 0, 0);
+          if (ta > 0) totals.push({ label: lbl, amount: ta });
+        }
+        continue; // subtotal / total / carried-to-summary roll-ups are never line items
+      }
       const qty = qtyCol !== -1 ? cleanNum(cells[qtyCol]) : 0;
       const supply = supplyCol !== -1 ? cleanNum(cells[supplyCol]) : undefined;
       const install = installCol !== -1 ? cleanNum(cells[installCol]) : undefined;
       const rate = rateMode === "split" ? (supply ?? 0) + (install ?? 0) : singleRateCol !== -1 ? cleanNum(cells[singleRateCol]) : 0;
-      // Club supply + installation amounts when the sheet splits them; else use the
-      // single amount column, else compute from qty × combined rate.
-      const amount = supplyAmtCol !== -1 && installAmtCol !== -1
-        ? cleanNum(cells[supplyAmtCol]) + cleanNum(cells[installAmtCol])
-        : amountCol !== -1 ? cleanNum(cells[amountCol]) : qty * rate;
+      // Clubs supply + installation amounts when split; else single amount column,
+      // else qty × combined rate.
+      const amount = rowAmount(cells, qty, rate);
       // Skip section headings / spec paragraphs: no qty, no rate, no amount.
       if (!qty && !rate && !amount) continue;
       lines.push({ item, unit: unitCol !== -1 ? String(cells[unitCol] ?? "").trim() : "", budgetedQty: qty, supplyRate: supply, installRate: install, rate, amount });
@@ -196,6 +218,18 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
 
     const parts = [`desc col ${descCol}`, unitCol !== -1 ? "unit" : "no unit", qtyCol !== -1 ? "qty" : "no qty",
       rateMode === "split" ? "supply+install rate" : rateMode === "single" ? "rate" : "no rate", amountCol !== -1 ? "amount" : "computed amount"];
+
+    // Reconcile: the stated total is the grand total when one is labelled (the
+    // largest such), else the sum of the sheet's section subtotals. Compared to the
+    // parsed line sum within a small tolerance.
+    const parsedTotal = lines.reduce((s, l) => s + l.amount, 0);
+    const grands = totals.filter((t) => /grand/.test(t.label)).map((t) => t.amount);
+    const statedTotal = grands.length
+      ? Math.max(...grands)
+      : totals.length ? totals.reduce((s, t) => s + t.amount, 0) : null;
+    const tol = statedTotal == null ? 0 : Math.max(2, statedTotal * 0.005);
+    const reconciled: ParsedSheet["reconciled"] = statedTotal == null ? "unchecked"
+      : Math.abs(parsedTotal - statedTotal) <= tol ? "ok" : "mismatch";
 
     out.push({
       sheetName,
@@ -205,6 +239,9 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
       rateMode,
       columnNote: parts.join(" · "),
       lines,
+      parsedTotal,
+      statedTotal,
+      reconciled,
     });
   }
 

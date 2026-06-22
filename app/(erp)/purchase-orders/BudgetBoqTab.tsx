@@ -201,12 +201,20 @@ export default function BudgetBoqTab({ projectId, projectName, role }: { project
               </button>
             </div>
           </div>
-          <p style={{ fontSize: "12px", color: "#999999", marginBottom: "14px" }}>Untick sheets you don&apos;t want, and rename the package label per sheet. Summary / measurement sheets are pre-unticked.</p>
+          <p style={{ fontSize: "12px", color: "#999999", marginBottom: "14px" }}>Untick sheets you don&apos;t want, and rename the package label per sheet. Summary / measurement sheets are pre-unticked. &quot;Total vs sheet&quot; cross-checks the parsed total against each sheet&apos;s own total.</p>
+          {review.some((s) => s.include && s.reconciled === "mismatch") && (
+            <div style={{ marginBottom: "14px", padding: "10px 12px", background: "rgba(186,26,26,0.07)", borderRadius: "8px", fontSize: "12px", color: "#ba1a1a", display: "flex", gap: "8px", alignItems: "flex-start" }}>
+              <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>warning</span>
+              <span>Some ticked sheets&apos; parsed totals don&apos;t match the sheet&apos;s own stated total. Review the flagged rows (⚠) before importing — the parse may be picking up the wrong column or a stray row.</span>
+            </div>
+          )}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>
                 <th style={{ ...th, width: "40px" }}>Use</th><th style={th}>Sheet</th><th style={th}>Package name</th>
-                <th style={{ ...th, textAlign: "right" }}>Lines</th><th style={th}>Detected</th>
+                <th style={{ ...th, textAlign: "right" }}>Lines</th>
+                <th style={{ ...th, textAlign: "right" }}>Total vs sheet</th>
+                <th style={th}>Detected</th>
               </tr></thead>
               <tbody>
                 {review.map((s, i) => (
@@ -222,6 +230,15 @@ export default function BudgetBoqTab({ projectId, projectName, role }: { project
                         style={{ width: "180px", padding: "4px 8px", border: "1px solid #e4e2e1", borderRadius: "6px", fontSize: "12px" }} />
                     </td>
                     <td style={{ ...cell, textAlign: "right", fontWeight: "bold", color: s.lines.length ? "#333333" : "#bbbbbb" }}>{s.lines.length}</td>
+                    <td style={{ ...cell, fontSize: "11px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {s.reconciled === "ok" ? (
+                        <span style={{ color: "#16a34a", fontWeight: "bold" }} title="Parsed total matches the sheet's own total">✓ {inr(s.parsedTotal)}</span>
+                      ) : s.reconciled === "mismatch" ? (
+                        <span style={{ color: "#ba1a1a", fontWeight: "bold" }} title={`Parsed ${inr(s.parsedTotal)} vs the sheet's stated total ${inr(s.statedTotal ?? 0)}`}>⚠ {inr(s.parsedTotal)} ≠ {inr(s.statedTotal ?? 0)}</span>
+                      ) : (
+                        <span style={{ color: "#bbbbbb" }}>—</span>
+                      )}
+                    </td>
                     <td style={{ ...cell, fontSize: "11px", color: s.skipReason ? "#a36200" : "#666666" }}>
                       {s.skipReason ?? s.columnNote}{s.rateMode === "split" ? " · supply+install" : ""}
                     </td>
