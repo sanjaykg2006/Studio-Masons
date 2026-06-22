@@ -47,6 +47,7 @@ export type PaymentRequestDTO = {
   priority?: string;
   accountsApprovedBy?: string;
   paidBy?: string;
+  fileName?: string;
 };
 
 const num = (v: { toString(): string } | null) => (v == null ? undefined : Number(v));
@@ -139,6 +140,7 @@ export async function loadPaymentRequests(): Promise<PaymentRequestDTO[]> {
     priority: str(r.priority),
     accountsApprovedBy: str(r.accountsApprovedBy),
     paidBy: str(r.paidBy),
+    fileName: str(r.fileName),
   }));
 }
 
@@ -159,6 +161,7 @@ export async function savePaymentRequests(list: PaymentRequestDTO[]): Promise<vo
         priority: r.priority ?? null,
         accountsApprovedBy: r.accountsApprovedBy ?? null,
         paidBy: r.paidBy ?? null,
+        fileName: r.fileName ?? null,
       })),
     }),
   ]);

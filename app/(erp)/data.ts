@@ -6,6 +6,17 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { Prisma } from "@/app/generated/prisma";
 
+// ── Current user ──────────────────────────────────────────────────
+// Lightweight current-user shape for client-side role gating (the real
+// enforcement stays in the server actions via requireRole). Returns null when
+// not authenticated / provisioned.
+export type CurrentUserDTO = { id: string; name: string; role: string } | null;
+export async function loadCurrentUser(): Promise<CurrentUserDTO> {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  return { id: user.id, name: user.name, role: user.role };
+}
+
 // ── Projects ──────────────────────────────────────────────────────
 export type AppProjectDTO = { id: string; name: string; clientName: string; location: string; pct: number; engineer: string; isDelayed: boolean };
 export async function loadAppProjects(): Promise<AppProjectDTO[]> {
@@ -249,16 +260,16 @@ export async function loadBoqItems(): Promise<BoqItemDTO[]> {
 }
 
 // ── Site expenses + vendor scope ──────────────────────────────────
-export type ExpenseDTO = { id: string; category: string; description: string; project: string; amount: string; amountNum: number; date: string; by: string; status: string; pmApprovedBy?: string; billingApprovedBy?: string; accountsApprovedBy?: string };
+export type ExpenseDTO = { id: string; category: string; description: string; project: string; amount: string; amountNum: number; date: string; by: string; status: string; pmApprovedBy?: string; billingApprovedBy?: string; accountsApprovedBy?: string; fileName?: string };
 export type ScopeDTO = { id: string; vendor: string; project: string; scope: string; progress: number; status: string; dueDate: string };
 export async function loadExpenses(): Promise<ExpenseDTO[]> {
   const rows = await prisma.siteExpenseEntry.findMany({ orderBy: { sortOrder: "asc" } });
-  return rows.map((r) => ({ id: r.id, category: r.category, description: r.description, project: r.projectName, amount: r.amount, amountNum: Number(r.amountNum), date: r.date, by: r.by, status: r.status, pmApprovedBy: r.pmApprovedBy ?? undefined, billingApprovedBy: r.billingApprovedBy ?? undefined, accountsApprovedBy: r.accountsApprovedBy ?? undefined }));
+  return rows.map((r) => ({ id: r.id, category: r.category, description: r.description, project: r.projectName, amount: r.amount, amountNum: Number(r.amountNum), date: r.date, by: r.by, status: r.status, pmApprovedBy: r.pmApprovedBy ?? undefined, billingApprovedBy: r.billingApprovedBy ?? undefined, accountsApprovedBy: r.accountsApprovedBy ?? undefined, fileName: r.fileName ?? undefined }));
 }
 export async function saveExpenses(list: ExpenseDTO[]): Promise<void> {
   await prisma.$transaction([
     prisma.siteExpenseEntry.deleteMany({}),
-    prisma.siteExpenseEntry.createMany({ data: list.map((e, i) => ({ id: e.id, category: e.category, description: e.description, projectName: e.project, amount: e.amount, amountNum: e.amountNum, date: e.date, by: e.by, status: e.status, pmApprovedBy: e.pmApprovedBy ?? null, billingApprovedBy: e.billingApprovedBy ?? null, accountsApprovedBy: e.accountsApprovedBy ?? null, sortOrder: i })) }),
+    prisma.siteExpenseEntry.createMany({ data: list.map((e, i) => ({ id: e.id, category: e.category, description: e.description, projectName: e.project, amount: e.amount, amountNum: e.amountNum, date: e.date, by: e.by, status: e.status, pmApprovedBy: e.pmApprovedBy ?? null, billingApprovedBy: e.billingApprovedBy ?? null, accountsApprovedBy: e.accountsApprovedBy ?? null, fileName: e.fileName ?? null, sortOrder: i })) }),
   ]);
 }
 export async function loadScope(): Promise<ScopeDTO[]> {

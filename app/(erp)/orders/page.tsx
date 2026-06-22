@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useProject, type Invoice, type PayReq, type InvStatus, type ReqStatus } from "../../../contexts/ProjectContext";
 import { loadOrdersPage, saveExpenses, saveScope } from "../data";
+import { uploadFileToStorage, resolveDocumentUrl, openDocument, isStored, docName, docExt } from "../docs";
 
 // ── Types ─────────────────────────────────────────────────────────
 // Invoice & payment-request types now live in ProjectContext (shared + persisted).
@@ -10,7 +11,7 @@ type ScopeStatus = "Not Started" | "In Progress" | "Completed" | "Delayed";
 // Site-expense approval workflow: site team logs → PM approves → billing approves → accounts approves & pays
 type ExpStatus = "Pending PM Approval" | "Pending Billing Approval" | "Pending Accounts Approval" | "Paid" | "Rejected";
 
-interface Expense { id:string; category:string; description:string; project:string; amount:string; amountNum:number; date:string; by:string; fileObj?:File; status:ExpStatus; pmApprovedBy?:string; billingApprovedBy?:string; accountsApprovedBy?:string; }
+interface Expense { id:string; category:string; description:string; project:string; amount:string; amountNum:number; date:string; by:string; fileObj?:File; fileName?:string; status:ExpStatus; pmApprovedBy?:string; billingApprovedBy?:string; accountsApprovedBy?:string; }
 interface VScope  { id:string; vendor:string; project:string; scope:string; progress:number; status:ScopeStatus; dueDate:string; }
 
 // A single base-value line on an invoice, each with its own GST. Invoices carry up to
@@ -96,7 +97,7 @@ export default function OrdersPage() {
   }, []);
   useEffect(() => {
     if (!ordersLoaded) return;
-    saveExpenses(expenses.map(e => ({ id: e.id, category: e.category, description: e.description, project: e.project, amount: e.amount, amountNum: e.amountNum, date: e.date, by: e.by, status: e.status, pmApprovedBy: e.pmApprovedBy, billingApprovedBy: e.billingApprovedBy, accountsApprovedBy: e.accountsApprovedBy })))
+    saveExpenses(expenses.map(e => ({ id: e.id, category: e.category, description: e.description, project: e.project, amount: e.amount, amountNum: e.amountNum, date: e.date, by: e.by, status: e.status, pmApprovedBy: e.pmApprovedBy, billingApprovedBy: e.billingApprovedBy, accountsApprovedBy: e.accountsApprovedBy, fileName: e.fileName })))
       .catch(err => console.warn("[Orders] expenses save failed:", err));
   }, [expenses, ordersLoaded]);
   useEffect(() => {
@@ -201,35 +202,62 @@ export default function OrdersPage() {
     return () => document.removeEventListener("mousedown", md);
   }, []);
 
-  // Blob URL for invoice file in slide-over
+  // Preview URL for invoice file in slide-over — a live blob URL when the file is
+  // still in memory, else a signed URL for the stored document (survives reload).
   useEffect(() => {
     if (slideInv?.fileObj instanceof Blob) {
       const url = URL.createObjectURL(slideInv.fileObj);
       setInvPreviewUrl(url);
       return () => { URL.revokeObjectURL(url); setInvPreviewUrl(null); };
     }
+    if (isStored(slideInv?.fileName)) {
+      let active = true;
+      resolveDocumentUrl(slideInv!.fileName!).then(u => { if (active) setInvPreviewUrl(u); }).catch(() => {});
+      return () => { active = false; setInvPreviewUrl(null); };
+    }
     setInvPreviewUrl(null);
   }, [slideInvId]);
 
-  // Blob URL for payment request invoice file
+  // Preview URL for payment request invoice file.
   useEffect(() => {
     if (viewReqInvoice?.invoiceFile instanceof Blob) {
       const url = URL.createObjectURL(viewReqInvoice.invoiceFile);
       setReqPreviewUrl(url);
       return () => { URL.revokeObjectURL(url); setReqPreviewUrl(null); };
     }
+    if (isStored(viewReqInvoice?.fileName)) {
+      let active = true;
+      resolveDocumentUrl(viewReqInvoice!.fileName!).then(u => { if (active) setReqPreviewUrl(u); }).catch(() => {});
+      return () => { active = false; setReqPreviewUrl(null); };
+    }
     setReqPreviewUrl(null);
   }, [viewReqInvoice]);
 
-  // Blob URL for site expense voucher file
+  // Preview URL for site expense voucher file.
   useEffect(() => {
     if (viewExpenseVoucher?.fileObj instanceof Blob) {
       const url = URL.createObjectURL(viewExpenseVoucher.fileObj);
       setVoucherPreviewUrl(url);
       return () => { URL.revokeObjectURL(url); setVoucherPreviewUrl(null); };
     }
+    if (isStored(viewExpenseVoucher?.fileName)) {
+      let active = true;
+      resolveDocumentUrl(viewExpenseVoucher!.fileName!).then(u => { if (active) setVoucherPreviewUrl(u); }).catch(() => {});
+      return () => { active = false; setVoucherPreviewUrl(null); };
+    }
     setVoucherPreviewUrl(null);
   }, [viewExpenseVoucher]);
+
+  // Preview kind from a live File's MIME type, falling back to the stored file's
+  // extension (after reload there is no File to read a type from).
+  const fileKind = (type?: string, name?: string): "pdf" | "image" | "other" => {
+    if (type === "application/pdf") return "pdf";
+    if (type?.startsWith("image/")) return "image";
+    const ext = docExt(name);
+    if (ext === "pdf") return "pdf";
+    if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
+    return "other";
+  };
 
   // Reset the approve modal whenever it opens.
   useEffect(() => {
@@ -507,7 +535,7 @@ export default function OrdersPage() {
       .reduce((s, i) => s + (i.baseValue ?? i.amountNum), 0);
   }
 
-  function submitNew() {
+  async function submitNew() {
     if (activeTab === 0) {
       if (!newInvFile) return; // invoice file is required
       const vendorName  = (newForm.vendor || "").trim();
@@ -566,6 +594,15 @@ export default function OrdersPage() {
         return;
       }
 
+      // Upload the invoice document so it stays retrievable after reload.
+      let invFileName: string;
+      try {
+        invFileName = await uploadFileToStorage(newInvFile, "invoice");
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "Couldn't upload the invoice file.");
+        return;
+      }
+
       const first = taxLines[0];
       const n: Invoice = {
         id: `SM-INV-${Date.now().toString().slice(-4)}`,
@@ -576,6 +613,7 @@ export default function OrdersPage() {
         due: newForm.due || "TBD",
         status: "Approval Pending",
         fileObj: newInvFile,
+        fileName: invFileName,
         taxLines,
         baseValue: baseVal,
         sgstPct: first.sgst,
@@ -589,6 +627,11 @@ export default function OrdersPage() {
       setUploadError(null);
       logActivity({ icon: "cloud_upload", color: "#e30613", route: "/orders", text: "Invoice submitted for", bold: projectName, detail: `Invoice ${n.id} from ${vendorName} for ${n.amount} uploaded — awaiting project-manager approval.` });
     } else if (activeTab === 1) {
+      let prFileName: string | undefined;
+      if (prFile) {
+        try { prFileName = await uploadFileToStorage(prFile, "payment-request"); }
+        catch (err) { setUploadError(err instanceof Error ? err.message : "Couldn't upload the invoice file."); return; }
+      }
       const n: PayReq = {
         id: `PR-${String(requests.length + 1).padStart(3, "0")}`,
         vendor: newForm.vendor || "Unknown Vendor",
@@ -599,12 +642,18 @@ export default function OrdersPage() {
         status: "Pending Accounts Approval",
         notes: newForm.notes,
         invoiceFile: prFile ?? undefined,
+        fileName: prFileName,
         invoiceRef: newForm.invoiceRef || undefined,
       };
       setRequests(prev => [n, ...prev]);
       setPrFile(null);
     } else if (activeTab === 2) {
       const amt = parseFloat(newForm.amount || "0");
+      let expFileName: string | undefined;
+      if (expenseFile) {
+        try { expFileName = await uploadFileToStorage(expenseFile, "site-expense"); }
+        catch (err) { setUploadError(err instanceof Error ? err.message : "Couldn't upload the voucher file."); return; }
+      }
       const n: Expense = {
         id: `EXP-${String(expenses.length + 1).padStart(3, "0")}`,
         category: newForm.category || "Miscellaneous",
@@ -615,6 +664,7 @@ export default function OrdersPage() {
         date: new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }),
         by: "You",
         fileObj: expenseFile ?? undefined,
+        fileName: expFileName,
         status: "Pending PM Approval",
       };
       setExpenses(prev => [n, ...prev]);
@@ -1088,7 +1138,7 @@ export default function OrdersPage() {
                             {r.status === "Approved by Accounts" && (
                               <button onClick={() => askApprover({ title:`Mark ${r.id} paid`, label:"Paid By Name", cta:"Mark Paid", defaultName: r.accountsApprovedBy ?? "Arjun K.", run:(name)=>markReqPaid(r.id, name) })} style={{ padding:"4px 12px", border:"1px solid rgba(0,89,168,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#0059a8", background:"rgba(0,89,168,0.05)", cursor:"pointer" }}>Mark Paid</button>
                             )}
-                            {r.invoiceFile ? (
+                            {r.invoiceFile || isStored(r.fileName) ? (
                               <button onClick={() => setViewReqInvoice(r)}
                                 style={{ padding:"4px 10px", border:"1px solid rgba(227,6,19,0.3)", borderRadius:"6px", fontSize:"11px", fontWeight:"bold", color:"#e30613", background:"rgba(227,6,19,0.05)", cursor:"pointer", display:"flex", alignItems:"center", gap:"4px" }}>
                                 <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>receipt</span> View Invoice
@@ -1180,7 +1230,7 @@ export default function OrdersPage() {
                                   </button>
                                 </>
                               )}
-                              {x.fileObj ? (
+                              {x.fileObj || isStored(x.fileName) ? (
                                 <button onClick={() => setViewExpenseVoucher(x)}
                                   style={{ padding:"4px 8px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", cursor:"pointer", display:"flex", alignItems:"center", gap:"4px", fontSize:"11px", fontWeight:"bold", color:"#e30613" }}
                                   title="View Voucher">
@@ -1381,16 +1431,16 @@ export default function OrdersPage() {
                   {invPreviewUrl && (
                     <section>
                       <h4 style={{ fontSize:"10px", fontWeight:"bold", textTransform:"uppercase", letterSpacing:"0.1em", color:"#999999", marginBottom:"10px" }}>Attached Invoice Document</h4>
-                      {slideInv.fileObj?.type === "application/pdf" ? (
+                      {fileKind(slideInv.fileObj?.type, slideInv.fileName) === "pdf" ? (
                         <iframe src={invPreviewUrl} title="Invoice" style={{ width:"100%", height:"220px", border:"1px solid #e4e2e1", borderRadius:"6px" }} />
-                      ) : slideInv.fileObj?.type.startsWith("image/") ? (
+                      ) : fileKind(slideInv.fileObj?.type, slideInv.fileName) === "image" ? (
                         <img src={invPreviewUrl} alt="Invoice" style={{ width:"100%", borderRadius:"6px", border:"1px solid #e4e2e1", maxHeight:"200px", objectFit:"contain" }} />
                       ) : (
                         <div style={{ padding:"12px", background:"#f8f8f8", border:"1px solid #e4e2e1", borderRadius:"6px", fontSize:"13px", color:"#666666" }}>
-                          {slideInv.fileObj?.name}
+                          {slideInv.fileObj?.name ?? docName(slideInv.fileName)}
                         </div>
                       )}
-                      <a href={invPreviewUrl} download={slideInv.fileObj?.name}
+                      <a href={invPreviewUrl} download={slideInv.fileObj?.name ?? docName(slideInv.fileName)}
                         style={{ marginTop:"6px", display:"inline-flex", alignItems:"center", gap:"6px", fontSize:"12px", color:"#e30613", fontWeight:"bold", textDecoration:"none" }}>
                         <span className="material-symbols-outlined" style={{ fontSize:"14px" }}>download</span>
                         Download
@@ -1475,18 +1525,21 @@ export default function OrdersPage() {
               </button>
             </div>
             <div style={{ flex:1, overflow:"auto", minHeight:"300px" }}>
-              {reqPreviewUrl && viewReqInvoice.invoiceFile?.type === "application/pdf" && (
+              {reqPreviewUrl && fileKind(viewReqInvoice.invoiceFile?.type, viewReqInvoice.fileName) === "pdf" && (
                 <iframe src={reqPreviewUrl} title="Invoice" style={{ width:"100%", height:"580px", border:"none", display:"block" }} />
               )}
-              {reqPreviewUrl && viewReqInvoice.invoiceFile?.type.startsWith("image/") && (
+              {reqPreviewUrl && fileKind(viewReqInvoice.invoiceFile?.type, viewReqInvoice.fileName) === "image" && (
                 <div style={{ background:"#1a1a1a", display:"flex", alignItems:"center", justifyContent:"center", minHeight:"300px" }}>
                   <img src={reqPreviewUrl} alt="Invoice" style={{ maxWidth:"100%", maxHeight:"70vh", objectFit:"contain" }} />
                 </div>
               )}
+              {!reqPreviewUrl && (
+                <div style={{ padding:"24px", textAlign:"center", fontSize:"14px", color:"#999999" }}>No invoice document attached</div>
+              )}
             </div>
             {reqPreviewUrl && (
               <div style={{ padding:"12px 20px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"8px", flexShrink:0 }}>
-                <a href={reqPreviewUrl} download={viewReqInvoice.invoiceFile?.name}
+                <a href={reqPreviewUrl} download={viewReqInvoice.invoiceFile?.name ?? docName(viewReqInvoice.fileName)}
                   style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", fontSize:"13px", textDecoration:"none", display:"flex", alignItems:"center", gap:"6px" }}>
                   <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>download</span> Download
                 </a>
@@ -1513,23 +1566,26 @@ export default function OrdersPage() {
               </button>
             </div>
             <div style={{ flex:1, overflow:"auto", minHeight:"300px" }}>
-              {voucherPreviewUrl && viewExpenseVoucher.fileObj?.type === "application/pdf" && (
+              {voucherPreviewUrl && fileKind(viewExpenseVoucher.fileObj?.type, viewExpenseVoucher.fileName) === "pdf" && (
                 <iframe src={voucherPreviewUrl} title="Voucher" style={{ width:"100%", height:"580px", border:"none", display:"block" }} />
               )}
-              {voucherPreviewUrl && viewExpenseVoucher.fileObj?.type.startsWith("image/") && (
+              {voucherPreviewUrl && fileKind(viewExpenseVoucher.fileObj?.type, viewExpenseVoucher.fileName) === "image" && (
                 <div style={{ background:"#1a1a1a", display:"flex", alignItems:"center", justifyContent:"center", minHeight:"300px" }}>
                   <img src={voucherPreviewUrl} alt="Voucher" style={{ maxWidth:"100%", maxHeight:"70vh", objectFit:"contain" }} />
                 </div>
               )}
-              {voucherPreviewUrl && !viewExpenseVoucher.fileObj?.type.startsWith("image/") && viewExpenseVoucher.fileObj?.type !== "application/pdf" && (
+              {voucherPreviewUrl && fileKind(viewExpenseVoucher.fileObj?.type, viewExpenseVoucher.fileName) === "other" && (
                 <div style={{ padding:"24px", textAlign:"center", fontSize:"14px", color:"#666666" }}>
-                  File type not previewable ({viewExpenseVoucher.fileObj?.name})
+                  File type not previewable ({viewExpenseVoucher.fileObj?.name ?? docName(viewExpenseVoucher.fileName)})
                 </div>
+              )}
+              {!voucherPreviewUrl && (
+                <div style={{ padding:"24px", textAlign:"center", fontSize:"14px", color:"#999999" }}>No voucher attached</div>
               )}
             </div>
             {voucherPreviewUrl && (
               <div style={{ padding:"12px 20px", borderTop:"1px solid #e4e2e1", background:"#f8f8f8", display:"flex", justifyContent:"flex-end", gap:"8px", flexShrink:0 }}>
-                <a href={voucherPreviewUrl} download={viewExpenseVoucher.fileObj?.name}
+                <a href={voucherPreviewUrl} download={viewExpenseVoucher.fileObj?.name ?? docName(viewExpenseVoucher.fileName)}
                   style={{ padding:"8px 20px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#333333", fontWeight:"bold", fontSize:"13px", textDecoration:"none", display:"flex", alignItems:"center", gap:"6px" }}>
                   <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>download</span> Download
                 </a>
@@ -1912,6 +1968,13 @@ export default function OrdersPage() {
                       <img src={previewUrl} alt="Invoice preview" style={{ width:"100%", maxHeight:"180px", objectFit:"contain", background:"#f0f0f0" }} />
                     ) : null}
                   </div>
+                )}
+                {/* After reload the in-memory file is gone — offer the stored document. */}
+                {!previewUrl && isStored(inv.fileName) && (
+                  <button type="button" onClick={() => openDocument(inv.fileName!).catch(() => {})}
+                    style={{ display:"inline-flex", alignItems:"center", gap:"6px", border:"1px solid #e4e2e1", borderRadius:"6px", background:"white", color:"#e30613", fontSize:"12px", fontWeight:"bold", padding:"8px 12px", cursor:"pointer", alignSelf:"flex-start" }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:"16px" }}>description</span> View attached document
+                  </button>
                 )}
 
                 {/* Approval Inputs Form */}

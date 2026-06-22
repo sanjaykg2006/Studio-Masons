@@ -1,11 +1,26 @@
 "use client";
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useProject, type VendorPO } from "../../../contexts/ProjectContext";
 import { useToast } from "@/lib/toast";
 import { PoLinesEditor, buildPoLines, inr, emptyLine, type DraftLine } from "./PoLinesEditor";
 import { parseBoqFile } from "./boqParser";
 import { generatePoPdf } from "./poDocument";
 import { DEFAULT_PAYMENT_TERMS, DEFAULT_NOTES, NOTE_ORDER, NOTE_LABELS, variableRemarkRows, BILLING_BRANCHES, DEFAULT_BILLING_BRANCH_ID, billingBranch } from "./poTerms";
+import { loadCurrentUser } from "../data";
+import { uploadFileToStorage, openDocument, isStored } from "../docs";
+import BudgetBoqTab from "./BudgetBoqTab";
+import IntentsTab from "./IntentsTab";
+import ComparisonTab from "./ComparisonTab";
+
+// The procurement → finance pipeline stages, shown as tabs. The PO generator is the
+// final stage (now fed by an approved intent's chosen vendor BOQ).
+const PROC_TABS = [
+  { id: "budget", label: "Budget BOQ", icon: "menu_book" },
+  { id: "intents", label: "Purchase Intents", icon: "playlist_add_check" },
+  { id: "comparison", label: "Quote Comparison", icon: "table_chart" },
+  { id: "generator", label: "PO Generator", icon: "request_quote" },
+] as const;
+type ProcTab = (typeof PROC_TABS)[number]["id"];
 
 const VARIABLE_ROWS = variableRemarkRows();
 const initialRemarks = () => Object.fromEntries(VARIABLE_ROWS.map((r) => [r.sl, r.defaultRemark]));
@@ -22,6 +37,12 @@ function ReqLabel({ children }: { children: ReactNode }) {
 export default function PurchaseOrdersPage() {
   const { selectedProject, vendorPOs, addVendorPO, removeVendorPO, acceptVendorPO, approveAdvance } = useProject();
   const toast = useToast();
+
+  // Active procurement-pipeline tab and the logged-in user's role (for gating the
+  // stage actions; the real enforcement lives in the server actions via requireRole).
+  const [tab, setTab] = useState<ProcTab>("budget");
+  const [role, setRole] = useState<string>("");
+  useEffect(() => { loadCurrentUser().then((u) => setRole(u?.role ?? "")).catch(() => setRole("")); }, []);
 
   // When set, the form is amending an existing PO rather than creating a new one.
   const [amendingId, setAmendingId] = useState<string | null>(null);
@@ -150,8 +171,9 @@ export default function PurchaseOrdersPage() {
     toast.success("Purchase order deleted", `${po.vendorName} — ${po.poNumber} removed from ${po.projectName ?? selectedProject?.name ?? "the project"}.`);
   }
 
-  // Acceptance — record the document + requested advance against a PO.
-  function submitAcceptance() {
+  // Acceptance — record the document + requested advance against a PO. The signed
+  // acceptance document is uploaded to storage so it stays retrievable later.
+  async function submitAcceptance() {
     const po = vendorPOs.find((v) => v.id === acceptanceId);
     if (!po) return;
     const adv = Number(acceptAdvance);
@@ -159,9 +181,14 @@ export default function PurchaseOrdersPage() {
       toast.warning("Missing details", "Attach the acceptance document and enter an advance within the PO value.");
       return;
     }
-    acceptVendorPO({ projectId: po.projectId, vendorName: po.vendorName, acceptanceFileName: acceptFile.name, advanceRequested: adv });
-    toast.success("Acceptance recorded", `${po.vendorName} accepted — advance of ₹${adv.toLocaleString("en-IN")} pending approval.`);
-    setAcceptanceId(null); setAcceptFile(null); setAcceptAdvance("");
+    try {
+      const path = await uploadFileToStorage(acceptFile, "po-acceptance");
+      acceptVendorPO({ projectId: po.projectId, vendorName: po.vendorName, acceptanceFileName: path, advanceRequested: adv });
+      toast.success("Acceptance recorded", `${po.vendorName} accepted — advance of ₹${adv.toLocaleString("en-IN")} pending approval.`);
+      setAcceptanceId(null); setAcceptFile(null); setAcceptAdvance("");
+    } catch (err) {
+      toast.warning("Couldn't upload acceptance", err instanceof Error ? err.message : "Try again.");
+    }
   }
 
   // Accounts approves the advance with a TDS %.
@@ -290,6 +317,29 @@ export default function PurchaseOrdersPage() {
         <span className="text-[#e30613]">Purchase Orders</span>
       </nav>
 
+      {/* Procurement-pipeline tabs */}
+      <div style={{ display: "flex", gap: "4px", borderBottom: "1px solid #e4e2e1", marginBottom: "28px", flexWrap: "wrap" }}>
+        {PROC_TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ display: "flex", alignItems: "center", gap: "6px", border: "none", background: "none", padding: "10px 14px", cursor: "pointer", fontSize: "13px", fontWeight: "bold", color: tab === t.id ? "#e30613" : "#666666", borderBottom: `2px solid ${tab === t.id ? "#e30613" : "transparent"}`, marginBottom: "-1px" }}>
+            <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>{t.icon}</span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab !== "generator" && !selectedProject && (
+        <div style={{ background: "white", border: "1px solid #e4e2e1", borderRadius: "12px", padding: "48px 24px", textAlign: "center" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: "40px", color: "#cccccc" }}>folder_open</span>
+          <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "#333333", marginTop: "12px" }}>Select a project first</h3>
+          <p style={{ fontSize: "13px", color: "#999999", marginTop: "6px" }}>Use the project selector in the top bar to choose the project.</p>
+        </div>
+      )}
+      {tab === "budget" && selectedProject && <BudgetBoqTab projectId={selectedProject.id} projectName={selectedProject.name} role={role} />}
+      {tab === "intents" && selectedProject && <IntentsTab projectId={selectedProject.id} projectName={selectedProject.name} role={role} />}
+      {tab === "comparison" && selectedProject && <ComparisonTab projectId={selectedProject.id} projectName={selectedProject.name} role={role} />}
+
+      {tab === "generator" && (<>
       <h2 className="text-[32px] font-bold text-[#333333] mb-2">Generate Purchase Order</h2>
       <p style={{ fontSize: "16px", color: "#666666", marginBottom: "32px", maxWidth: "560px", lineHeight: 1.6 }}>
         Raising a PO for{" "}
@@ -587,10 +637,18 @@ export default function PurchaseOrdersPage() {
                         Advance {inr(po.advanceRequested)} pending
                       </span>
                     ) : po.acceptanceFileName ? (
-                      <span style={{ fontSize: "11px", color: "#16a34a", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>task_alt</span>
-                        Acceptance recorded
-                      </span>
+                      isStored(po.acceptanceFileName) ? (
+                        <button type="button" onClick={() => openDocument(po.acceptanceFileName!).catch((e) => toast.warning("Couldn't open", e instanceof Error ? e.message : "Try again."))}
+                          style={{ fontSize: "11px", color: "#16a34a", display: "inline-flex", alignItems: "center", gap: "4px", border: "none", background: "none", padding: 0, cursor: "pointer", fontWeight: "bold" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>task_alt</span>
+                          Acceptance — view document
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "#16a34a", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: "13px" }}>task_alt</span>
+                          Acceptance recorded
+                        </span>
+                      )
                     ) : (
                       <span style={{ fontSize: "11px", color: "#999999" }}>Pending acceptance</span>
                     )}
@@ -718,6 +776,7 @@ export default function PurchaseOrdersPage() {
           </div>
         );
       })()}
+      </>)}
     </div>
   );
 }

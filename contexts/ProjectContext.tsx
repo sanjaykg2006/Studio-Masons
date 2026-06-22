@@ -83,7 +83,7 @@ export type ReqStatus = "Pending Accounts Approval" | "Approved by Accounts" | "
 
 export interface InvoiceTaxLine { base:number; sgst:number; cgst:number; igst:number; }
 export interface Invoice { id:string; vendor:string; project:string; amount:string; amountNum:number; due:string; status:InvStatus; flagged?:boolean; fileObj?:File; fileName?:string; baseValue?:number; sgstPct?:number; cgstPct?:number; igstPct?:number; taxLines?:InvoiceTaxLine[]; otherCharges?:number; remarks?:string; amountPayable?:number; requestedAmount?:number; advanceDeducted?:number; tdsPct?:number; retentionHeld?:boolean; retentionAmount?:number; retentionEarlyRelease?:boolean; pmApprovedAt?:string; pmApprovedBy?:string; accountsApprovedBy?:string; }
-export interface PayReq  { id:string; vendor:string; project:string; amount:string; amountNum:number; requested:string; status:ReqStatus; notes?:string; invoiceFile?:File; invoiceRef?:string; priority?:"Low" | "Medium" | "High"; accountsApprovedBy?:string; paidBy?:string; }
+export interface PayReq  { id:string; vendor:string; project:string; amount:string; amountNum:number; requested:string; status:ReqStatus; notes?:string; invoiceFile?:File; fileName?:string; invoiceRef?:string; priority?:"Low" | "Medium" | "High"; accountsApprovedBy?:string; paidBy?:string; }
 
 // A single entry in the dashboard's Recent Activity feed. Generated as real actions
 // happen across the app (vendors, advances, invoices, payments, progress).
@@ -187,6 +187,7 @@ const toReqDTO = (r: PayReq): PaymentRequestDTO => ({
   id: r.id, vendor: r.vendor, project: r.project, amount: r.amount, amountNum: r.amountNum,
   requested: r.requested, status: r.status, notes: r.notes, invoiceRef: r.invoiceRef,
   priority: r.priority, accountsApprovedBy: r.accountsApprovedBy, paidBy: r.paidBy,
+  fileName: r.fileName,
 });
 const fromReqDTO = (d: PaymentRequestDTO): PayReq => ({ ...d, status: d.status as ReqStatus, priority: d.priority as PayReq["priority"] });
 

@@ -10,7 +10,10 @@ const tabs = ["Profile", "Team & Roles", "Notifications", "ERP Connection", "App
 // Maps the UI role labels to the Prisma Role enum values.
 const roleEnum: Record<string, string> = {
   "Admin": "ADMIN",
+  "Project Director": "PROJECT_DIRECTOR",
   "Project Manager": "PROJECT_MANAGER",
+  "Procurement Manager": "PROCUREMENT_MANAGER",
+  "Senior QS Engineer": "SENIOR_QS",
   "Designer": "DESIGNER",
   "Site Engineer": "SITE_ENGINEER",
   "Finance": "FINANCE",
@@ -27,7 +30,7 @@ function initials(value: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-const roles = ["Admin", "Project Manager", "Designer", "Site Engineer", "Finance", "Client"];
+const roles = ["Admin", "Project Director", "Project Manager", "Procurement Manager", "Senior QS Engineer", "Designer", "Site Engineer", "Finance", "Client"];
 
 const notifications = [
   { label: "New snag raised", desc: "Get notified when a snag is raised on your project", email: true, inApp: true },

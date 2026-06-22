@@ -19,6 +19,23 @@ enum Role {
   SITE_ENGINEER
   FINANCE
   CLIENT
+  SENIOR_QS
+  PROCUREMENT_MANAGER
+  PROJECT_DIRECTOR
+}
+
+// Stages a Purchase Intent moves through, from the Project Manager raising it to
+// the Procurement Manager releasing the PO. See procurement.ts for the gating that
+// drives the PD reconfirmation step when an intent exceeds the budget BOQ.
+enum IntentStatus {
+  PENDING_PD_APPROVAL
+  PD_REJECTED
+  PD_APPROVED
+  QUOTES_PENDING
+  COMPARISON_PENDING_PD
+  PENDING_FINANCE
+  FINANCE_APPROVED
+  PO_RELEASED
 }
 
 enum ProjectStatus {
@@ -286,6 +303,8 @@ model PaymentRequest {
   priority           String?
   accountsApprovedBy String?
   paidBy             String?
+  // Storage path of the uploaded invoice document (see documents.ts), or null.
+  fileName           String?
   createdAt          DateTime @default(now())
 }
 
@@ -598,6 +617,8 @@ model SiteExpenseEntry {
   pmApprovedBy      String?
   billingApprovedBy String?
   accountsApprovedBy String?
+  // Storage path of the uploaded voucher document (see documents.ts), or null.
+  fileName          String?
   sortOrder         Int      @default(0)
 }
 
@@ -805,4 +826,129 @@ model ChangeItem {
   createdAt       DateTime @default(now())
 
   @@index([projectId])
+}
+
+// ── Procurement → Finance workflow ────────────────────────────────
+// The Budget BOQ released by the Senior QS Engineer — the "bible" that gates every
+// Purchase Intent on the project. One released budget per project; while DRAFT it
+// can be re-imported, once RELEASED its quantities are locked. projectId is a plain
+// string (not a FK) to match PurchaseOrder — projects are still a client-side demo.
+model BudgetBoq {
+  id          String          @id @default(cuid())
+  projectId   String
+  projectName String
+  fileName    String?
+  status      String          @default("DRAFT") // DRAFT | RELEASED
+  releasedBy  String?
+  releasedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  lines       BudgetBoqLine[]
+
+  @@index([projectId])
+}
+
+// A single budget line. budgetedQty is the cap; committedQty accumulates as POs are
+// released against this item, so remaining = budgetedQty − committedQty drives the
+// quantity restriction (including the partial draw-down case). packageName is the
+// procurement team's package-wise split, editable after release.
+model BudgetBoqLine {
+  id           String  @id @default(cuid())
+  boqId        String
+  packageName  String?
+  item         String
+  unit         String
+  budgetedQty  Decimal @db.Decimal(12, 2)
+  rate         Decimal @db.Decimal(15, 2)
+  amount       Decimal @db.Decimal(15, 2)
+  committedQty Decimal @db.Decimal(12, 2) @default(0)
+
+  boq BudgetBoq @relation(fields: [boqId], references: [id], onDelete: Cascade)
+
+  @@index([boqId])
+}
+
+// A Purchase Intent — the spine of the workflow. Raised by the Project Manager,
+// approved by the Project Director, quoted/compared by the Procurement Manager,
+// verified by Finance, then released as a PO. limitExceeded is set at submit time
+// when any line is over budget or a new item; the PD must set pdReconfirmed to
+// approve such an intent.
+model PurchaseIntent {
+  id                      String              @id @default(cuid())
+  projectId               String
+  projectName             String
+  intentNumber            String
+  packageName             String?
+  raisedBy                String
+  status                  IntentStatus        @default(PENDING_PD_APPROVAL)
+  limitExceeded           Boolean             @default(false)
+  pdApprovedBy            String?
+  pdApprovedAt            DateTime?
+  pdReconfirmed           Boolean             @default(false)
+  pdRejectReason          String?
+  comparisonFileName      String?
+  chosenQuoteId           String?
+  chosenVendorBoqFileName String?
+  financeApprovedBy       String?
+  financeApprovedAt       DateTime?
+  financeNotes            String?
+  releasedPoId            String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  lines                   PurchaseIntentLine[]
+  quotes                  VendorQuote[]
+
+  @@index([projectId])
+}
+
+// A requested item on an intent. budgetLineId links to the matched BudgetBoqLine
+// (null ⇒ new item not in the budget). exceedsBudget is set when requestedQty is
+// above the remaining budgeted qty; availableQtyAtSubmit snapshots that remaining.
+model PurchaseIntentLine {
+  id                   String  @id @default(cuid())
+  intentId             String
+  budgetLineId         String?
+  item                 String
+  unit                 String
+  requestedQty         Decimal @db.Decimal(12, 2)
+  isNewItem            Boolean @default(false)
+  exceedsBudget        Boolean @default(false)
+  availableQtyAtSubmit Decimal? @db.Decimal(12, 2)
+
+  intent PurchaseIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  @@index([intentId])
+}
+
+// A vendor quote collected by the Procurement Manager for an intent. The chosen one
+// (PurchaseIntent.chosenQuoteId) is the source of the released PO; Finance verifies
+// its vendor financial details (gstin / bank).
+model VendorQuote {
+  id               String           @id @default(cuid())
+  intentId         String
+  vendorName       String
+  vendorGstin      String?
+  vendorBankDetails String?
+  fileName         String?
+  totalValue       Decimal          @db.Decimal(15, 2)
+  createdAt        DateTime         @default(now())
+  lines            VendorQuoteLine[]
+
+  intent PurchaseIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  @@index([intentId])
+}
+
+model VendorQuoteLine {
+  id       String  @id @default(cuid())
+  quoteId  String
+  item     String
+  unit     String
+  quantity Decimal @db.Decimal(12, 2)
+  rate     Decimal @db.Decimal(15, 2)
+  amount   Decimal @db.Decimal(15, 2)
+
+  quote VendorQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
 }
