@@ -35,6 +35,20 @@ const DESC_STRONG = ["description", "particular", "nomenclature", "scope", "of w
 const DESC_WEAK = ["item", "service", "work"];
 const SERIAL_HEADERS = ["item no", "item no.", "sl no", "sl.no", "s.no", "s no", "sno", "si no", "s.l", "sl", "s no.", "version"];
 
+// Roll-up rows that aren't real line items: "Total", "Sub Total", "Grand Total",
+// "Total Modular", "Sub Total Carried to Summary", "GST", etc. These carry an
+// amount but no procurable item, so they must be excluded on every sheet. A long
+// description that merely contains the word "total" is left alone (≤ 44 chars
+// keeps it to short total labels, not spec sentences).
+function isTotalRow(item: string): boolean {
+  const t = item.toLowerCase().replace(/\s+/g, " ").trim();
+  if (/carried (to|forward)/.test(t)) return true;
+  if (/\b(sub ?-? ?total|subtotal|grand ?total|g\.? ?total|say total)\b/.test(t)) return true;
+  if (/\btotals?\b/.test(t) && t.length <= 44) return true;
+  if (/^(gst|igst|cgst|sgst|round ?off)\b/.test(t)) return true;
+  return false;
+}
+
 function cleanNum(v: unknown): number {
   if (v == null || v === "") return 0;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
@@ -130,6 +144,7 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
       const item = String(cells[descCol] ?? "").trim();
       if (!item || item.length < 2) continue;
       if (/^\d+(\.\d+)?$/.test(item)) continue; // stray serial number leaked into desc
+      if (isTotalRow(item)) continue;            // subtotal / total / carried-to-summary roll-ups
       const qty = qtyCol !== -1 ? cleanNum(cells[qtyCol]) : 0;
       const supply = supplyCol !== -1 ? cleanNum(cells[supplyCol]) : undefined;
       const install = installCol !== -1 ? cleanNum(cells[installCol]) : undefined;
