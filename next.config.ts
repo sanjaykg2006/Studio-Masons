@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/**": ["./app/generated/prisma/**/*"],
   },
+  experimental: {
+    // Document uploads (budget BOQ workbooks, PO/invoice scans) go through Server
+    // Actions, whose request body defaults to a 1 MB cap — too small for real
+    // multi-MB BOQs. Raise it to match the 20 MB limit enforced in documents.ts.
+    serverActions: { bodySizeLimit: "25mb" },
+  },
 };
 
 export default nextConfig;
