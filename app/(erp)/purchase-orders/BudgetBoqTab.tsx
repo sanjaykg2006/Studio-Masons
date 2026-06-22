@@ -7,6 +7,7 @@ import {
   loadBudgetBoq,
   saveBudgetBoqDraft,
   releaseBudgetBoq,
+  deleteBudgetBoq,
   setLinePackage,
   type BudgetBoqDTO,
   type BudgetLineInput,
@@ -88,6 +89,23 @@ export default function BudgetBoqTab({ projectId, projectName, role }: { project
     }
   }
 
+  // Wipe the project's budget BOQ (even if released) so a corrected workbook can be
+  // re-imported — the previous import keeps its (possibly stale) stored amounts.
+  async function replaceBudget() {
+    if (!boq) return;
+    if (!confirm("Delete the current budget BOQ and start a fresh import? This removes all its lines (including a released baseline).")) return;
+    setBusy(true);
+    try {
+      await deleteBudgetBoq(projectId);
+      setBoq(null); setReview(null); setPendingFile(null);
+      toast.success("Budget BOQ cleared", "Upload the workbook again to re-import with the latest parsing.");
+    } catch (err) {
+      toast.warning("Couldn't clear", err instanceof Error ? err.message : "Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function release() {
     if (!boq) return;
     if (!confirm("Release the budget BOQ? Quantities lock and become the baseline for all purchase intents.")) return;
@@ -140,6 +158,13 @@ export default function BudgetBoqTab({ projectId, projectName, role }: { project
                 style={{ display: "inline-flex", alignItems: "center", gap: "4px", border: "1px solid #e4e2e1", borderRadius: "6px", background: "white", color: "#0059a8", fontSize: "11px", fontWeight: "bold", padding: "4px 10px", cursor: "pointer" }}>
                 <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>description</span>
                 {docName(boq?.fileName)}
+              </button>
+            )}
+            {isQs && boq && (
+              <button type="button" onClick={replaceBudget} disabled={busy}
+                style={{ display: "inline-flex", alignItems: "center", gap: "4px", border: "1px solid #ba1a1a", borderRadius: "6px", background: "white", color: "#ba1a1a", fontSize: "11px", fontWeight: "bold", padding: "4px 10px", cursor: busy ? "wait" : "pointer" }}>
+                <span className="material-symbols-outlined" style={{ fontSize: "14px" }}>restart_alt</span>
+                Replace / re-import
               </button>
             )}
             <span style={{ fontSize: "11px", fontWeight: "bold", padding: "4px 10px", borderRadius: "999px", background: released ? "rgba(22,163,74,0.1)" : "rgba(0,89,168,0.1)", color: released ? "#16a34a" : "#0059a8" }}>

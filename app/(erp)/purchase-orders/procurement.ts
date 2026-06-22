@@ -240,6 +240,14 @@ export async function releaseBudgetBoq(boqId: string): Promise<BudgetBoqDTO> {
   return boqToDTO(boq);
 }
 
+// Deletes the project's budget BOQ (cascading its lines) so the QS can re-import a
+// corrected workbook — even a released one. Use with care: any intents already
+// raised keep their snapshot, but the gating baseline is rebuilt on re-import.
+export async function deleteBudgetBoq(projectId: string): Promise<void> {
+  await requireRole(["SENIOR_QS", "ADMIN"]);
+  await prisma.budgetBoq.deleteMany({ where: { projectId } });
+}
+
 // Procurement assigns a line to a package (package-wise split). Allowed after release.
 export async function setLinePackage(lineId: string, packageName: string): Promise<void> {
   await requireRole(["PROCUREMENT_MANAGER", "ADMIN"]);
