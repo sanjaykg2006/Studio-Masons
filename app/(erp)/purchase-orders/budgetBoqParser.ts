@@ -43,8 +43,12 @@ const SERIAL_HEADERS = ["item no", "item no.", "sl no", "sl.no", "s.no", "s no",
 function isTotalRow(item: string): boolean {
   const t = item.toLowerCase().replace(/\s+/g, " ").trim();
   if (/carried (to|forward)/.test(t)) return true;
-  if (/\b(sub ?-? ?total|subtotal|grand ?total|g\.? ?total|say total)\b/.test(t)) return true;
-  if (/\btotals?\b/.test(t) && t.length <= 44) return true;
+  // Starts with a total label — covers "Total", "TOTAL AMOUNT", "Total Modular" and
+  // long section totals like "Total Amount Section-4 ( Fire Sprinkler System )"
+  // regardless of length, so a section subtotal row is never summed as a line item.
+  if (/^(sub ?-? ?total|subtotal|grand ?total|g\.? ?total|say total|total)\b/.test(t)) return true;
+  // Subtotal / grand total appearing mid-line.
+  if (/\b(sub ?-? ?total|subtotal|grand ?total)\b/.test(t)) return true;
   if (/^(gst|igst|cgst|sgst|round ?off)\b/.test(t)) return true;
   return false;
 }
@@ -129,13 +133,30 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
       // Split supply / installation rate columns (tolerate the "suply" misspelling).
       supplyCol = findCol(cells, (h) => (h.includes("supply") || h.includes("suply")) && h.includes("rate"));
       installCol = findCol(cells, (h) => h.includes("install") && h.includes("rate"));
-      // Multi-row header: a bare "Rate" with "Supply | Installation" on the next row.
-      if (supplyCol === -1 && installCol === -1 && i + 1 < rows.length) {
-        // Array.from densifies any sparse holes so findIndex never sees `undefined`.
+      // Two-row header: a "Rate" and/or "Amount" header with "Supply | Installation"
+      // split on the row beneath (ACS / CCTV / IT). Each split pair is assigned to
+      // rate vs amount by header position. Array.from densifies sparse holes; long
+      // cells (description text like "Supply and installation of…") are ignored.
+      if (i + 1 < rows.length && ((supplyCol === -1 && installCol === -1) || (supplyAmtCol === -1 && installAmtCol === -1))) {
         const sub = Array.from(rows[i + 1] ?? [], (c) => norm(c));
-        const s = sub.findIndex((h) => h.includes("supply") || h.includes("suply"));
-        const ins = sub.findIndex((h) => h.includes("install"));
-        if (s !== -1 && ins !== -1) { supplyCol = s; installCol = ins; }
+        const supplyIdx: number[] = []; const installIdx: number[] = [];
+        sub.forEach((h, idx) => {
+          if (h.length > 18) return;
+          if (h.includes("supply") || h.includes("suply")) supplyIdx.push(idx);
+          else if (h.includes("install")) installIdx.push(idx);
+        });
+        const pick = (idxs: number[], lo: number, hi: number) => idxs.find((x) => x >= lo && (hi === -1 || x < hi)) ?? -1;
+        // Rate split lives between the "Rate" header and the "Amount" header.
+        if (supplyCol === -1 && installCol === -1 && rateLike !== -1) {
+          const hi = amt > rateLike ? amt : -1;
+          const rs = pick(supplyIdx, rateLike, hi); const ri = pick(installIdx, rateLike, hi);
+          if (rs !== -1 && ri !== -1) { supplyCol = rs; installCol = ri; }
+        }
+        // Amount split lives at or after the "Amount" header.
+        if (supplyAmtCol === -1 && installAmtCol === -1 && amt !== -1) {
+          const as = pick(supplyIdx, amt, -1); const ai = pick(installIdx, amt, -1);
+          if (as !== -1 && ai !== -1) { supplyAmtCol = as; installAmtCol = ai; }
+        }
       }
       if (supplyCol === -1 && installCol === -1) {
         // Single rate: prefer an exact "rate" over "basic rate".
