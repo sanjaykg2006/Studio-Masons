@@ -85,11 +85,21 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const out: ParsedSheet[] = [];
+  // Per-sheet visibility metadata (Hidden: 0 = visible, 1 = hidden, 2 = very hidden).
+  const visibility = wb.Workbook?.Sheets ?? [];
 
-  for (const sheetName of wb.SheetNames) {
+  for (let si = 0; si < wb.SheetNames.length; si++) {
+    const sheetName = wb.SheetNames[si];
     const sheet = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false });
     const nameNorm = norm(sheetName);
+
+    // Auto-skip sheets hidden in the workbook — the user doesn't see these (e.g. the
+    // duplicate "- Indegene" working copies), so they shouldn't import by default.
+    if (visibility[si]?.Hidden) {
+      out.push({ sheetName, suggestedPackage: sheetName.trim(), skipped: true, skipReason: "Hidden in the workbook", rateMode: "none", columnNote: "—", lines: [] });
+      continue;
+    }
 
     // Auto-skip obvious non-line-item sheets by name.
     if (/summary|measurement|^m sheet|cost-?summary/.test(nameNorm)) {
@@ -100,6 +110,7 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
     // Locate the header row: a description-ish column plus a qty / rate / amount.
     let headerIdx = -1, descCol = -1, unitCol = -1, qtyCol = -1, amountCol = -1;
     let supplyCol = -1, installCol = -1, singleRateCol = -1;
+    let supplyAmtCol = -1, installAmtCol = -1; // split "Total Amount (Supply/Installation)" columns
     for (let i = 0; i < Math.min(rows.length, 25); i++) {
       const cells = rows[i].map((c) => String(c ?? ""));
       const d = findDescCol(cells);
@@ -112,6 +123,9 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
       headerIdx = i; descCol = d; qtyCol = q;
       unitCol = findCol(cells, (h) => h.includes("unit") || h.includes("uom") || h === "u.o.m");
       amountCol = findCol(cells, (h) => h.includes("amount") && !h.includes("rate"));
+      // Split amount columns — "Total Amount (Supply)" + "Total Amount (Installation)".
+      supplyAmtCol = findCol(cells, (h) => h.includes("amount") && (h.includes("supply") || h.includes("suply")));
+      installAmtCol = findCol(cells, (h) => h.includes("amount") && h.includes("install"));
       // Split supply / installation rate columns (tolerate the "suply" misspelling).
       supplyCol = findCol(cells, (h) => (h.includes("supply") || h.includes("suply")) && h.includes("rate"));
       installCol = findCol(cells, (h) => h.includes("install") && h.includes("rate"));
@@ -149,7 +163,11 @@ export async function parseBudgetWorkbook(file: File): Promise<ParsedSheet[]> {
       const supply = supplyCol !== -1 ? cleanNum(cells[supplyCol]) : undefined;
       const install = installCol !== -1 ? cleanNum(cells[installCol]) : undefined;
       const rate = rateMode === "split" ? (supply ?? 0) + (install ?? 0) : singleRateCol !== -1 ? cleanNum(cells[singleRateCol]) : 0;
-      const amount = amountCol !== -1 ? cleanNum(cells[amountCol]) : qty * rate;
+      // Club supply + installation amounts when the sheet splits them; else use the
+      // single amount column, else compute from qty × combined rate.
+      const amount = supplyAmtCol !== -1 && installAmtCol !== -1
+        ? cleanNum(cells[supplyAmtCol]) + cleanNum(cells[installAmtCol])
+        : amountCol !== -1 ? cleanNum(cells[amountCol]) : qty * rate;
       // Skip section headings / spec paragraphs: no qty, no rate, no amount.
       if (!qty && !rate && !amount) continue;
       lines.push({ item, unit: unitCol !== -1 ? String(cells[unitCol] ?? "").trim() : "", budgetedQty: qty, supplyRate: supply, installRate: install, rate, amount });
