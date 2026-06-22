@@ -275,7 +275,7 @@ export async function saveScope(list: ScopeDTO[]): Promise<void> {
 // ── Quality ───────────────────────────────────────────────────────
 // A filled checklist item carries the response controls (two inspection levels +
 // not-applicable + remarks) alongside the template label.
-export type InspectionItemDTO = { label: string; linked: boolean; level1: boolean; level2: boolean; na: boolean; remarks: string };
+export type InspectionItemDTO = { label: string; linked: boolean; answer: "" | "yes" | "no" | "na"; remarks: string };
 export type InspectionResponseDTO = { name: string; items: InspectionItemDTO[] };
 export type InspectionDTO = { id: string; project: string; area: string; category: string; inspector: string; date: string; result: string; score: number; remarks: string; workType: string; contractor: string; drawingNo: string; responses: InspectionResponseDTO[] };
 export type QualityChecklistDTO = { name: string; items: { label: string; linked: boolean }[] };

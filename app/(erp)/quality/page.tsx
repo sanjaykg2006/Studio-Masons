@@ -10,9 +10,10 @@ import {
 
 type Result = "Pass" | "Fail" | "Conditional" | "Draft";
 
-// A live checklist item gathers the two inspection levels, a not-applicable flag,
-// and free-text remarks — the controls that replace the old single checkbox.
-type LiveItem = { label: string; linked: boolean; level1: boolean; level2: boolean; na: boolean; remarks: string };
+// A live checklist item carries a single Yes/No (or N/A) answer plus free-text
+// remarks. An empty answer means the item hasn't been inspected yet.
+type Answer = "" | "yes" | "no" | "na";
+type LiveItem = { label: string; linked: boolean; answer: Answer; remarks: string };
 type LiveCat = { name: string; items: LiveItem[] };
 
 interface Inspection {
@@ -47,12 +48,12 @@ const RESULT_STYLE: Record<Result, string> = {
 
 // Build a blank live checklist from a template's sections.
 const freshChecklist = (template: QualityChecklistDTO[]): LiveCat[] =>
-  template.map(c => ({ name: c.name, items: c.items.map(i => ({ label: i.label, linked: i.linked, level1: false, level2: false, na: false, remarks: "" })) }));
+  template.map(c => ({ name: c.name, items: c.items.map(i => ({ label: i.label, linked: i.linked, answer: "" as Answer, remarks: "" })) }));
 
-// Level 2 is the final sign-off, so an item is complete only when Level 2 (or N/A)
-// is set. Level 1 alone is an in-progress first-stage check.
-const isDone = (it: { level1: boolean; level2: boolean; na: boolean }) => it.na || it.level2;
-const isPartial = (it: { level1: boolean; level2: boolean; na: boolean }) => !it.na && it.level1 && !it.level2;
+// An item counts as complete when answered "Yes" or marked N/A; a "No" is a
+// failed check that still needs attention.
+const isDone = (it: { answer: Answer }) => it.answer === "yes" || it.answer === "na";
+const isFail = (it: { answer: Answer }) => it.answer === "no";
 
 const todayStr = () => new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const blankForm = () => ({ project: "", area: "", category: "", inspector: "", remarks: "", workType: "", contractor: "", drawingNo: "", date: todayStr() });
@@ -79,12 +80,11 @@ function downloadInspection(insp: Inspection) {
 
   let n = 0;
   const rows = cats.map((cat) => {
-    const head = `<tr class="sec"><td></td><td colspan="4">${esc(cat.name)}</td></tr>`;
+    const head = `<tr class="sec"><td></td><td colspan="3">${esc(cat.name)}</td></tr>`;
     const items = cat.items.map((it) => {
       n += 1;
-      const l1 = it.na ? "N/A" : it.level1 ? "✓" : "";
-      const l2 = it.na ? "" : it.level2 ? "✓" : "";
-      return `<tr><td class="c">${n}</td><td>${esc(it.label)}</td><td class="c">${l1}</td><td class="c">${l2}</td><td>${esc(it.remarks)}</td></tr>`;
+      const status = it.answer === "yes" ? "Yes" : it.answer === "no" ? "No" : it.answer === "na" ? "N/A" : "";
+      return `<tr><td class="c">${n}</td><td>${esc(it.label)}</td><td class="c">${status}</td><td>${esc(it.remarks)}</td></tr>`;
     }).join("");
     return head + items;
   }).join("");
@@ -121,8 +121,8 @@ function downloadInspection(insp: Inspection) {
     <tr><td class="lbl">Inspection Report No</td><td colspan="3">${esc(reportNoFor(insp))}</td></tr>
   </table>
   <table class="grid">
-    <thead><tr><th>S NO</th><th>Description</th><th>Level 1</th><th>Level 2</th><th>Remarks</th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="5" style="text-align:center;color:#999;padding:16px">No checklist items recorded.</td></tr>`}</tbody>
+    <thead><tr><th>S NO</th><th>Description</th><th>Yes / No</th><th>Remarks</th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="4" style="text-align:center;color:#999;padding:16px">No checklist items recorded.</td></tr>`}</tbody>
   </table>
   <div class="obs"><b>Observations:</b> ${esc(insp.remarks || "")}</div>
   <table class="sign">
@@ -191,10 +191,9 @@ export default function QualityPage() {
   // ── Live checklist item mutators ──────────────────────────────
   const patchItem = (ci: number, ii: number, patch: Partial<LiveItem>) =>
     setChecks2(prev => prev.map((cat, c) => c !== ci ? cat : { ...cat, items: cat.items.map((it, i) => i !== ii ? it : { ...it, ...patch }) }));
-  // Level 2 (final sign-off) implies Level 1; clearing Level 1 also clears Level 2.
-  const toggleL1 = (ci: number, ii: number, it: LiveItem) => patchItem(ci, ii, it.level1 ? { level1: false, level2: false, na: false } : { level1: true, na: false });
-  const toggleL2 = (ci: number, ii: number, it: LiveItem) => patchItem(ci, ii, it.level2 ? { level2: false } : { level1: true, level2: true, na: false });
-  const toggleNA = (ci: number, ii: number, it: LiveItem) => patchItem(ci, ii, { na: !it.na, level1: false, level2: false });
+  // Set the item's answer; clicking the active choice again clears it.
+  const setAnswer = (ci: number, ii: number, it: LiveItem, val: Answer) =>
+    patchItem(ci, ii, { answer: it.answer === val ? "" : val });
 
   const allItems = checks2.flatMap(c => c.items);
   const totalItems = allItems.length;
@@ -487,15 +486,15 @@ export default function QualityPage() {
                     <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#e30613] mb-3">{cat.name}</h4>
                     <div className="space-y-2">
                       {cat.items.map((item, ii) => (
-                        <div key={ii} className={`p-3 border rounded transition-all ${item.na ? "border-[#e4e2e1] bg-[#f8f8f8]" : isDone(item) ? "border-[#16a34a]/30 bg-[#16a34a]/5" : isPartial(item) ? "border-[#ca8a04]/40 bg-[#ca8a04]/5" : "border-[#e4e2e1]"}`}>
+                        <div key={ii} className={`p-3 border rounded transition-all ${item.answer === "na" ? "border-[#e4e2e1] bg-[#f8f8f8]" : isDone(item) ? "border-[#16a34a]/30 bg-[#16a34a]/5" : isFail(item) ? "border-[#ba1a1a]/40 bg-[#ba1a1a]/5" : "border-[#e4e2e1]"}`}>
                           <div className="flex items-start justify-between gap-2 mb-2">
                             <span className="text-[13px] text-[#333333] flex-1">{item.label}</span>
                             {item.linked && <span className="text-[10px] text-[#e30613] font-bold shrink-0">→ SNAG</span>}
                           </div>
                           <div className="flex items-center gap-2 mb-2">
-                            <Toggle on={item.level1} label="Level 1" color="#16a34a" onClick={() => toggleL1(ci, ii, item)} />
-                            <Toggle on={item.level2} label="Level 2" color="#0059a8" onClick={() => toggleL2(ci, ii, item)} />
-                            <Toggle on={item.na} label="N/A" color="#666666" onClick={() => toggleNA(ci, ii, item)} />
+                            <Toggle on={item.answer === "yes"} label="Yes" color="#16a34a" onClick={() => setAnswer(ci, ii, item, "yes")} />
+                            <Toggle on={item.answer === "no"} label="No" color="#ba1a1a" onClick={() => setAnswer(ci, ii, item, "no")} />
+                            <Toggle on={item.answer === "na"} label="N/A" color="#666666" onClick={() => setAnswer(ci, ii, item, "na")} />
                           </div>
                           <input value={item.remarks} onChange={e => patchItem(ci, ii, { remarks: e.target.value })}
                             placeholder="Remarks…" className="w-full border border-[#e4e2e1] rounded px-2.5 py-1.5 text-[12px] outline-none focus:border-[#e30613]" />
@@ -646,10 +645,10 @@ export default function QualityPage() {
                             {it.remarks && <div className="text-[11px] text-[#999999] italic mt-0.5">{it.remarks}</div>}
                           </div>
                           <div className="flex gap-1 shrink-0">
-                            {it.na ? <span className="text-[10px] font-bold text-[#666666]">N/A</span> : <>
-                              <span className={`text-[10px] font-bold ${it.level1 ? "text-[#16a34a]" : "text-[#e4e2e1]"}`}>L1</span>
-                              <span className={`text-[10px] font-bold ${it.level2 ? "text-[#0059a8]" : "text-[#e4e2e1]"}`}>L2</span>
-                            </>}
+                            {it.answer === "na" ? <span className="text-[10px] font-bold text-[#666666]">N/A</span>
+                              : it.answer === "yes" ? <span className="text-[10px] font-bold text-[#16a34a]">Yes</span>
+                              : it.answer === "no" ? <span className="text-[10px] font-bold text-[#ba1a1a]">No</span>
+                              : <span className="text-[10px] font-bold text-[#e4e2e1]">—</span>}
                           </div>
                         </div>
                       ))}

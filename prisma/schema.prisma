@@ -626,7 +626,7 @@ model QualityInspection {
   contractor  String?
   drawingNo   String?
   // Snapshot of the filled checklist at submit time:
-  // [{ name, items: [{ label, linked, level1, level2, na, remarks }] }]
+  // [{ name, items: [{ label, linked, answer, remarks }] }]  answer: "" | "yes" | "no" | "na"
   responses   Json?
   sortOrder   Int     @default(0)
 }
