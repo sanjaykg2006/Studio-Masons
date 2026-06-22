@@ -17,6 +17,8 @@ export type BudgetLineDTO = {
   unit: string;
   budgetedQty: number;
   rate: number;
+  supplyRate: number | null;
+  installRate: number | null;
   amount: number;
   committedQty: number;
   remainingQty: number;
@@ -42,7 +44,7 @@ export type IntentLineDTO = {
   exceedsBudget: boolean;
   availableQtyAtSubmit: number | null;
 };
-export type QuoteLineDTO = { id: string; item: string; unit: string; quantity: number; rate: number; amount: number };
+export type QuoteLineDTO = { id: string; item: string; unit: string; quantity: number; rate: number; supplyRate: number | null; installRate: number | null; amount: number };
 export type VendorQuoteDTO = {
   id: string;
   vendorName: string;
@@ -97,6 +99,8 @@ function boqToDTO(boq: BoqWithLines): BudgetBoqDTO {
         unit: l.unit,
         budgetedQty: budgeted,
         rate: Number(l.rate),
+        supplyRate: l.supplyRate == null ? null : Number(l.supplyRate),
+        installRate: l.installRate == null ? null : Number(l.installRate),
         amount: Number(l.amount),
         committedQty: committed,
         remainingQty: budgeted - committed,
@@ -148,6 +152,8 @@ function intentToDTO(i: IntentFull): IntentDTO {
         unit: ql.unit,
         quantity: Number(ql.quantity),
         rate: Number(ql.rate),
+        supplyRate: ql.supplyRate == null ? null : Number(ql.supplyRate),
+        installRate: ql.installRate == null ? null : Number(ql.installRate),
         amount: Number(ql.amount),
       })),
     })),
@@ -175,7 +181,7 @@ export async function loadBudgetBoq(projectId: string): Promise<BudgetBoqDTO | n
   return boq ? boqToDTO(boq) : null;
 }
 
-export type BudgetLineInput = { packageName?: string; item: string; unit: string; budgetedQty: number; rate: number };
+export type BudgetLineInput = { packageName?: string; item: string; unit: string; budgetedQty: number; rate: number; supplyRate?: number; installRate?: number; amount?: number };
 
 // Senior QS imports / re-imports the budget. Only allowed while DRAFT (or when no
 // budget exists yet) — a RELEASED budget is locked. Replaces all lines.
@@ -196,7 +202,9 @@ export async function saveBudgetBoqDraft(input: {
     unit: l.unit.trim(),
     budgetedQty: l.budgetedQty,
     rate: l.rate,
-    amount: l.budgetedQty * l.rate,
+    supplyRate: l.supplyRate ?? null,
+    installRate: l.installRate ?? null,
+    amount: l.amount ?? l.budgetedQty * l.rate,
   }));
 
   if (existing) {
@@ -355,7 +363,7 @@ export async function rejectIntent(input: { intentId: string; reason: string }):
 }
 
 // ── Quotes / Comparison ───────────────────────────────────────────
-export type QuoteLineInput = { item: string; unit: string; quantity: number; rate: number };
+export type QuoteLineInput = { item: string; unit: string; quantity: number; rate: number; supplyRate?: number; installRate?: number };
 export async function addVendorQuote(input: {
   intentId: string;
   vendorName: string;
@@ -374,7 +382,7 @@ export async function addVendorQuote(input: {
       vendorBankDetails: input.vendorBankDetails ?? null,
       fileName: input.fileName ?? null,
       totalValue: total,
-      lines: { create: input.lines.map((l) => ({ item: l.item.trim(), unit: l.unit.trim(), quantity: l.quantity, rate: l.rate, amount: l.quantity * l.rate })) },
+      lines: { create: input.lines.map((l) => ({ item: l.item.trim(), unit: l.unit.trim(), quantity: l.quantity, rate: l.rate, supplyRate: l.supplyRate ?? null, installRate: l.installRate ?? null, amount: l.quantity * l.rate })) },
     },
   });
   const updated = await prisma.purchaseIntent.findUnique({ where: { id: input.intentId }, include: intentInclude });
@@ -443,7 +451,7 @@ export async function releaseIntentPo(input: {
     poValue: Number(quote.totalValue),
     poFileName: input.poFileName,
     vendorGstin: quote.vendorGstin ?? undefined,
-    lines: quote.lines.map((l) => ({ service: l.item, unit: l.unit, quantity: Number(l.quantity), rate: Number(l.rate), amount: Number(l.amount) })),
+    lines: quote.lines.map((l) => ({ service: l.item, unit: l.unit, quantity: Number(l.quantity), rate: Number(l.rate), supplyRate: l.supplyRate == null ? undefined : Number(l.supplyRate), installRate: l.installRate == null ? undefined : Number(l.installRate), amount: Number(l.amount) })),
   });
 
   // Draw down the budget against the intent lines (the source of the requested

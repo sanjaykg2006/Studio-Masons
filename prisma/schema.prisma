@@ -238,13 +238,15 @@ model PurchaseOrder {
 
 // A single service / scope line on a purchase order. poValue is the sum of these.
 model PurchaseOrderLine {
-  id       String  @id @default(cuid())
-  poId     String
-  service  String
-  unit     String
-  quantity Decimal @db.Decimal(12, 2)
-  rate     Decimal @db.Decimal(15, 2)
-  amount   Decimal @db.Decimal(15, 2)
+  id          String  @id @default(cuid())
+  poId        String
+  service     String
+  unit        String
+  quantity    Decimal @db.Decimal(12, 2)
+  rate        Decimal @db.Decimal(15, 2)
+  supplyRate  Decimal? @db.Decimal(15, 2)
+  installRate Decimal? @db.Decimal(15, 2)
+  amount      Decimal @db.Decimal(15, 2)
 
   po PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
 }
@@ -859,7 +861,11 @@ model BudgetBoqLine {
   item         String
   unit         String
   budgetedQty  Decimal @db.Decimal(12, 2)
+  // `rate` is the effective combined rate (supply + installation where the BOQ
+  // splits them). supplyRate / installRate keep the split when present.
   rate         Decimal @db.Decimal(15, 2)
+  supplyRate   Decimal? @db.Decimal(15, 2)
+  installRate  Decimal? @db.Decimal(15, 2)
   amount       Decimal @db.Decimal(15, 2)
   committedQty Decimal @db.Decimal(12, 2) @default(0)
 
@@ -940,13 +946,15 @@ model VendorQuote {
 }
 
 model VendorQuoteLine {
-  id       String  @id @default(cuid())
-  quoteId  String
-  item     String
-  unit     String
-  quantity Decimal @db.Decimal(12, 2)
-  rate     Decimal @db.Decimal(15, 2)
-  amount   Decimal @db.Decimal(15, 2)
+  id          String  @id @default(cuid())
+  quoteId     String
+  item        String
+  unit        String
+  quantity    Decimal @db.Decimal(12, 2)
+  rate        Decimal @db.Decimal(15, 2)
+  supplyRate  Decimal? @db.Decimal(15, 2)
+  installRate Decimal? @db.Decimal(15, 2)
+  amount      Decimal @db.Decimal(15, 2)
 
   quote VendorQuote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 

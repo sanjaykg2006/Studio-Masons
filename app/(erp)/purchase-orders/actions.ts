@@ -9,6 +9,8 @@ export type POLine = {
   unit: string;
   quantity: number;
   rate: number;
+  supplyRate?: number | null;
+  installRate?: number | null;
   amount: number;
 };
 
@@ -87,6 +89,8 @@ function toRecord(po: POWithLines): PORecord {
       unit: l.unit,
       quantity: Number(l.quantity),
       rate: Number(l.rate),
+      supplyRate: l.supplyRate == null ? null : Number(l.supplyRate),
+      installRate: l.installRate == null ? null : Number(l.installRate),
       amount: Number(l.amount),
     })),
   };
@@ -132,7 +136,7 @@ export type SavePOInput = {
   fixedContract?: boolean;
   contractStart?: string;
   contractEnd?: string;
-  lines?: Array<{ service: string; unit: string; quantity: number; rate: number; amount: number }>;
+  lines?: Array<{ service: string; unit: string; quantity: number; rate: number; supplyRate?: number | null; installRate?: number | null; amount: number }>;
 };
 
 // The PO-document detail fields, mapped to Prisma data (undefined → null so an amend
@@ -164,6 +168,8 @@ export async function savePurchaseOrder(input: SavePOInput): Promise<PORecord> {
     unit: l.unit,
     quantity: l.quantity,
     rate: l.rate,
+    supplyRate: l.supplyRate ?? null,
+    installRate: l.installRate ?? null,
     amount: l.amount,
   }));
 
